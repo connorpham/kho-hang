@@ -17,8 +17,9 @@ evd/**
 
 # ── Tài liệu nội bộ ────────────────────────────────────────────────────────
 # SRS/SRD phân loại "Nội bộ / Confidential" mà repo đang PUBLIC → giữ ở máy.
-# HỆ QUẢ: gate `verbatim` chỉ chạy được trên máy có sẵn các file này; trên CI
-# nó sẽ đỏ vì thiếu specs.sources. Đổi repo sang private để bỏ khối này.
+# HỆ QUẢ: khi BA trỏ specs.sources vào các file này, gate `verbatim` sẽ chạy
+# được ở máy local nhưng ĐỎ trên CI (file không tồn tại ở đó). Hiện sources còn
+# rỗng nên gate đang pass kèm cảnh báo. Đổi repo sang private để bỏ khối này.
 docs/*.docx
 docs/*.pdf
 docs/*.html

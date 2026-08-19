@@ -1,12 +1,30 @@
 name: vteam gate
 on: [push, pull_request]
+
 jobs:
   gate:
     runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts giải biến qua env() nên `prisma generate` cần biến này
+      # tồn tại. CI không kết nối DB thật — chuỗi giả là đủ để generate.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci?schema=public
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci_shadow?schema=public
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with: { python-version: '3.11' }
+
       - run: pip install pillow
+
+      # Profile nextjs-prisma chạy lint/typegen/tsc/test/build qua npm — không có
+      # node_modules thì các bước đó đỏ vì thiếu dependency, không phải vì lỗi code.
+      - run: npm ci
+
       - run: bash .vteam/scripts/gate.sh

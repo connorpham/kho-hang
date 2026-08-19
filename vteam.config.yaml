@@ -44,7 +44,10 @@ stack:
   package_manager: npm
 
 git:
-  protected_branch: main
+  # develop là nhánh tích hợp: mọi PR merge vào đây. main là nhánh phát hành.
+  # LƯU Ý: hook pre-push chỉ bảo vệ ĐƯỢC MỘT nhánh — nhánh khai báo ở đây. main
+  # phải được bảo vệ bằng branch protection trên GitHub, hook không canh nó.
+  protected_branch: develop
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
   merge_strategy: merge
   # merge | squash | rebase — how PRs land on the protected branch. squash and

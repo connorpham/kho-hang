@@ -66,6 +66,22 @@ npm run dev
 | `npm run db:migrate` | `prisma migrate dev` (cần DB + shadow DB) |
 | `npm run gate` | Chạy toàn bộ quality gate của vteam |
 
+## Nhánh và PR
+
+| Nhánh | Vai trò |
+|---|---|
+| `main` | Nhánh phát hành. Không commit trực tiếp. |
+| `develop` | **Nhánh tích hợp — mọi PR merge vào đây.** Khai báo ở `git.protected_branch`. |
+| `feat/WMS-<n>-<slug>` / `fix/WMS-<n>-<slug>` | Nhánh làm việc. Grammar do `git.branch_pattern` cưỡng chế. |
+
+Hook `.githooks/pre-push` cưỡng chế: không push trực tiếp vào `develop`, quét bí
+mật trên toàn bộ nội dung đi ra, và mọi nhánh có diff chạm `src/` hoặc `prisma/`
+phải đúng grammar **và** có review dossier `evd/<TICKET>/dev/review.md` đã commit
+với card R1, R2 (+R3 khi diff chạm `review.high_stakes_paths`).
+
+> Hook chỉ bảo vệ được **một** nhánh — nhánh ghi ở `git.protected_branch`. Vì vậy
+> `main` cần branch protection cấu hình trên GitHub; hook không canh `main`.
+
 ## Quy trình làm việc (vteam)
 
 ```bash
@@ -97,8 +113,10 @@ Ticket đi qua **Jira** (`project.key = WMS`), nên Jira project phải có key 
 
 - SRS/SRD phân loại **"Nội bộ / Confidential"** nhưng repo GitHub đang **public**,
   nên `docs/*.docx`, `docs/*.pdf`, `docs/*.html` bị gitignore và chỉ tồn tại trên
-  máy bạn. **Hệ quả:** gate `verbatim` không chạy được trên CI. Chuyển repo sang
-  private thì bỏ được khối ignore đó.
+  máy bạn. **Hệ quả:** ngay khi BA trỏ `specs.sources` vào các file đó, gate
+  `verbatim` sẽ xanh ở local nhưng **đỏ trên CI** vì file không có ở đó. Hiện
+  `sources` còn rỗng nên gate pass kèm cảnh báo. Chuyển repo sang private thì bỏ
+  được khối ignore đó và hết vấn đề.
 - Token (Jira, DB) chỉ nằm trong `.env` — không bao giờ commit. `.env.example` là
   bản mẫu rỗng.
 
