@@ -8,3 +8,13 @@
 #   items:
 #     - "PROJ-1 1.5"
 #     - "PROJ-2 0.5"
+
+# Q2 đã chốt 2026-08-19 (docs/pm/decisions.md): sprint-1 bắt đầu ngay hôm nay.
+# 10 ngày làm việc (19/08 Tư → 01/09 Ba) × capacity_per_day 0.8 = 8 person-day.
+# items CÒN RỖNG vì Jira project WMS chưa có ticket nào — BA nạp vào ngay khi
+# batch ticket đầu tiên qua gate B4. Sprint rỗng nghĩa là schedule_check chỉ
+# xác nhận "hôm nay nằm trong sprint", chưa đo được tải thật.
+sprint-1:
+  start: 2026-08-19
+  end: 2026-09-01
+  items: []

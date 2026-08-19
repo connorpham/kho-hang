@@ -23,6 +23,10 @@ evd/**
 docs/*.docx
 docs/*.pdf
 docs/*.html
+# Q3 chốt 2026-08-19: giữ repo public, bản markdown nguồn của SRS/SRD CHỈ
+# nằm ở máy. Không có dòng này thì docs/specs/sources/*.md sẽ được commit
+# và toàn văn yêu cầu mật lên repo public — đúng thứ Q3 muốn tránh.
+docs/specs/sources/
 
 # ── Next.js / Node ─────────────────────────────────────────────────────────
 /node_modules
