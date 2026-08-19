@@ -9,3 +9,4 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 
 | Date | Lane | Actor | Item | Result | Link |
 |---|---|---|---|---|---|
+| 2026-08-19 | PM | Connor Pham | T0 roll call — mở ngày làm việc /team | blocked: preflight ĐỎ (tracker + DB) | docs/pm/sessions/2026-08-19-1539.md |
