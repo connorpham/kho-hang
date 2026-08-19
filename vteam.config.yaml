@@ -7,6 +7,12 @@ project:
   key: WMS
   language: vi
   adopted: 2026-08-19
+  # 🟡 MỐC TẠM (Q1, 2026-08-19) — chưa phải cam kết với khách hàng.
+  # Số học: nền (schema 34 thực thể + migration thủ công + auth/RBAC) ~15 pd
+  # + 20 màn hình × ~1.5 pd = ~45 pd; ÷ capacity_per_day 0.8 = 56 ngày làm
+  # việc → 2026-11-05; cộng đệm 20% → 2026-11-24. Mọi ước lượng ở đây là
+  # PHỎNG ĐOÁN cho tới khi BA có backlog thật — thay ngày này ngay khi có.
+  go_live: 2026-11-24
 
 paths:
   specs: docs/specs
