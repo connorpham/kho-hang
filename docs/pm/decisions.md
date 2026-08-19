@@ -72,7 +72,7 @@ và nạp `docs/pm/plan.yaml` sprint-1 (5.5/8.0 pd):
 
 | Ticket | Việc | pd | DoR hiện tại |
 |---|---|---|---|
-| WMS-1 | Đo p95 lượt đọc phiên (điều kiện chốt ADR-0002) | 0.5 | ✅ **sẵn sàng code** |
+| WMS-1 | Đo p95 lượt đọc phiên (điều kiện chốt ADR-0002) | 0.5 | ⛔ **failed vòng review 19/08** — R1+R2 đều REQUEST-CHANGES, 11 finding chặn. Kết luận đã rút. Lần thử 1/2 (luật 2 lần hỏng thì lên bàn chủ dự án) |
 | WMS-2 | Nền danh tính NguoiDung/VaiTro/Kho/Phien + migration | 1.5 | ❌ chờ WMS-1 |
 | WMS-3 | S-01 đăng nhập + khoá tạm | 1.5 | ❌ chờ WMS-2 · thiếu oracle thiết kế (G-04) · nội dung thông báo chờ G-01 |
 | WMS-4 | S-02 chọn kho làm việc | 1.0 | ❌ chờ WMS-2, WMS-3 · thiếu oracle (G-04) · chờ G-03 |

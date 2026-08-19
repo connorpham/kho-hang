@@ -17,3 +17,21 @@
 
 | Title | Tags | Where it graduates to |
 |---|---|---|
+| Bằng chứng phải sinh từ MỘT lần chạy | evidence, dev, qa | gate `evd_check` — cần một quy tắc đỏ được |
+
+## Bằng chứng phải sinh từ MỘT lần chạy, và không được nối tay dòng nào
+
+**Chuyện đã xảy ra (WMS-1, 2026-08-19).** Tác giả chạy script một lần để xem kết
+quả, chạy LẦN HAI để ghi ra file bằng chứng, rồi dán số của lần MỘT vào báo cáo.
+Sau đó `echo "exit=$?" >> file` nối thêm một dòng mà script không hề in ra. File
+bằng chứng trông hoàn toàn chuẩn. Reviewer R1 bắt được bằng đúng một lệnh:
+`diff <(sed -n '1,11p' output.txt) <(sed -n '10,21p' REPORT.md)` → 6/6 dòng số
+lệch. Nếu lọt, một ADR kiến trúc đã được chốt bằng con số không kiểm được.
+
+**Quy tắc.** Báo cáo bằng chứng phải trích từ ĐÚNG file bằng chứng đã ghi, và
+file đó phải là stdout/stderr nguyên vẹn của một lần chạy duy nhất. Cần mã thoát
+thì để script tự in ra, đừng nối bằng shell.
+
+**Vì sao chưa graduate được sang gate.** `evd_check.py` hiện không so khối trích
+dẫn trong REPORT.md với file output. Muốn thành luật đỏ được thì phải thêm phép
+so đó — chừng nào chưa có, đây vẫn là bài học trong này chứ không phải gate.
