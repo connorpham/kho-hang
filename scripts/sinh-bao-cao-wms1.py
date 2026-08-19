@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """sinh-bao-cao-wms1.py — sinh evd/WMS-1/REPORT.md TỪ evd/WMS-1/do-p95.json.
 
-Vì sao có file này: vòng review 1 của WMS-1 bắt được lỗi khối "kết quả thật"
-trong báo cáo và file bằng chứng là hai lần chạy khác nhau — vì con số được
-người viết chép tay. Không chép tay nữa: mọi con số trong báo cáo được nội suy
-từ đúng file JSON mà script đo ghi ra. Sửa báo cáo nghĩa là chạy lại phép đo.
+Vòng review 1 của WMS-1 bắt được lỗi khối "kết quả thật" trong báo cáo và file
+bằng chứng là hai lần chạy khác nhau, vì con số được chép tay. Không chép tay
+nữa: mọi số ở đây nội suy từ đúng file JSON mà script đo ghi ra. Sửa báo cáo
+nghĩa là chạy lại phép đo.
 
     node --env-file-if-exists=.env scripts/do-p95-phien.mjs   # ghi JSON
     python3 scripts/sinh-bao-cao-wms1.py                      # ghi REPORT.md
@@ -14,105 +14,126 @@ from pathlib import Path
 
 d = json.loads(Path("evd/WMS-1/do-p95.json").read_text(encoding="utf-8"))
 mt, ng, pq, qs = d["moiTruong"], d["nguong"], d["phanQuyet"], d["quanSat"]
-sach = next(k for k in d["ketQua"] if k["hoSo"] == "sach")
-rac = next(k for k in d["ketQua"] if k["hoSo"] == "rac_2_trieu")
+P = pq["poolPhanQuyet"]
+o = [k for k in d["ketQua"] if k["pool"] == P]
+tv_max = max(k["tongP95TrungVi"] for k in o)
 
 
-def bang_lan(k):
+def bang_pool():
     r = []
-    for i, l in enumerate(k["lan"], 1):
-        r.append(f"| {i} | {l['nen']['p95']:.3f} | {l['truyVanTai']['p95']:.3f} "
-                 f"| {l['choPool']['p95']:.3f} |")
+    for x in d["theoPool"]:
+        dau = " ←" if x["pool"] == P else ""
+        r.append(f"| {x['pool']}{dau} | {x['tongP95TrungViXau']:.1f} | "
+                 f"{x['tongP95XauNhat']:.1f} | "
+                 f"{'✅' if x['tongP95XauNhat'] <= ng['nguongMs'] else '❌'} |")
+    return "\n".join(r)
+
+
+def bang_loat():
+    r = []
+    for k in d["ketQua"]:
+        if k["pool"] != P:
+            continue
+        loat = " · ".join(f"{x:.1f}" for x in k["tongP95MoiLan"])
+        r.append(f"| `{k['hoSo']}` | {k['soDong']:,} | {k['bytes'] / 1048576:.1f} | "
+                 f"{loat} | {k['tongP95TrungVi']:.1f} | {k['tongP95XauNhat']:.1f} |")
     return "\n".join(r)
 
 
 md = f"""# WMS-1 — Chi phí lượt đọc phiên (điều kiện chốt ADR-0002)
 
-> # ⚠️ PHÁN QUYẾT ĐANG BỊ TRANH CÃI — vòng review 2, 2026-08-19
->
-> Reviewer R1 chỉ ra: điều kiện của ADR-0002 nói *"mỗi request cộng thêm một lượt
-> đi CSDL"*, mà **việc lấy kết nối là một phần của lượt đi đó**. Báo cáo này loại
-> chờ pool ra khỏi phán quyết — và chính việc loại đó giữ phán quyết ở ĐẠT.
-> R1 đo được **riêng chờ pool p95 vượt trần 50 ms ở 2/6 lần chạy** (160 ms, 57 ms).
->
-> Đọc theo cách gồm chi phí lấy kết nối → **2/6 lần chạy TRƯỢT**.
-> Đọc theo cách loại nó ra → phán quyết dưới đây đứng.
->
-> Chọn cách đọc nào là quyết định kiến trúc, không phải việc của phép đo.
-> Đã chuyển sang `docs/pm/decisions.md §2` chờ chủ dự án.
-> Toàn bộ: [`dev/review.md`](dev/review.md).
-
 > **File này do máy sinh** từ `evd/WMS-1/do-p95.json` bằng
-> `scripts/sinh-bao-cao-wms1.py`. Không con số nào được chép tay — vòng review 1
-> bắt đúng lỗi đó. Sửa báo cáo = chạy lại phép đo.
+> `scripts/sinh-bao-cao-wms1.py`. Không con số nào chép tay.
 > Lần viết **{d['lanViet']}** · đo lúc `{d['ngay']}`
+>
+> **Đọc theo:** {d['docTheo']}
 
 ## Phán quyết
 
-**ADR-0002 {'ĐẠT' if pq['datNganSachAdr0002'] else 'TRƯỢT'} điều kiện của chính nó.**
-p95 của lượt truy vấn, lấy lần xấu nhất trong {mt['soLanLap']} lần lặp × {len(d['ketQua'])} hồ sơ
-dữ liệu: **{pq['truyVanP95CanCu']:.3f} ms**, so với ngưỡng {ng['nguongMs']:.0f} ms
-({ng['tyLeToiDa'] * 100:.0f}% của ngân sách {ng['nganSachMs']} ms, NFR-PER-02).
-Tức lượt đọc phiên chiếm **{pq['truyVanP95CanCu'] / ng['nganSachMs'] * 100:.2f}%** ngân sách.
+**ADR-0002 {'ĐẠT' if pq['datNganSachAdr0002'] else 'TRƯỢT'} điều kiện của chính nó, ở cấu hình pool {P}.**
 
-Đây là phán quyết **duy nhất** phép đo này có tư cách đưa ra.
+p95 của **TỔNG** (chờ lấy kết nối + truy vấn), lần **xấu nhất** trong
+{mt['soLanLap']} lần lặp × {len(o)} hồ sơ dữ liệu: **{pq['tongP95CanCu']:.3f} ms**
+trên trần **{ng['nguongMs']:.0f} ms** ({ng['tyLeToiDa'] * 100:.0f}% ngân sách
+{ng['nganSachMs']} ms, NFR-PER-02).
 
-## Số đo
+Trung vị của các lần lặp là **{tv_max:.1f} ms** — tức trường hợp thường gặp còn
+cách trần khoảng **{ng['nguongMs'] / tv_max:.1f} lần**. Nhưng xem mục Ổn định
+trước khi tin con số này.
 
-Môi trường: {mt['pg']} · `shared_buffers` {mt['sharedBuffers']} · {mt['host']}/{mt['db']} ·
-pool {mt['pool']} kết nối · {mt['nguoiDongThoi']} người đồng thời · {mt['soLanLap']} lần lặp mỗi hồ sơ.
+## Kích thước pool là biến, không phải hằng số
 
-### Hồ sơ `sach` — {sach['soDong']:,} dòng, {sach['bytes'] / 1048576:.1f} MB
+ADR-0002 Sửa đổi 1 biến pool thành quyết định kiến trúc. Đây là số liệu cho quyết
+định đó — cùng phép đo, chỉ đổi kích thước pool:
 
-| Lần | Nền p95 (ms) | Truy vấn khi tải p95 (ms) | Chờ pool p95 (ms) |
+| Pool | TỔNG p95 trung vị (ms) | TỔNG p95 xấu nhất (ms) | Dưới trần {ng['nguongMs']:.0f} ms? |
 |---|---|---|---|
-{bang_lan(sach)}
+{bang_pool()}
 
-### Hồ sơ `rac_2_trieu` — {rac['soDong']:,} dòng, {rac['bytes'] / 1048576:.1f} MB
+`max_connections` của CSDL: **{mt['maxConnections']}**. Quy tắc của ADR là ràng
+buộc TỔNG (`số bản sao × pool + dự phòng ≤ max_connections`), nên pool {P} cho
+tối đa 3 bản sao vẫn còn {int(mt['maxConnections']) - 3 * P} kết nối dự phòng.
 
-| Lần | Nền p95 (ms) | Truy vấn khi tải p95 (ms) | Chờ pool p95 (ms) |
-|---|---|---|---|
-{bang_lan(rac)}
+Đáng chú ý: **pool lớn hơn không tốt hơn.** Pool 40 tệ hơn pool 20 ở cả trung vị
+lẫn xấu nhất — thêm kết nối chỉ chuyển hàng đợi từ pool sang chính CSDL.
 
-## Ba điều số liệu nói mà lần viết trước nói ngược
+## Ổn định — phần phải đọc trước khi trích con số đi đâu
 
-**1. Rác trong bảng phiên gần như không ảnh hưởng.** Bảng phình từ
-{sach['bytes'] / 1048576:.1f} MB lên {rac['bytes'] / 1048576:.1f} MB
-({rac['soDong']:,} dòng, vượt xa `shared_buffers` {mt['sharedBuffers']}) mà p95 truy vấn
-xấu nhất còn *nhích xuống*: {sach['truyVanTaiP95XauNhat']:.3f} → {rac['truyVanTaiP95XauNhat']:.3f} ms.
-Lần viết trước bày 50.000 dòng rác ra như một sức ép; số liệu nói nó không phải.
-Việc dọn phiên hết hạn vì thế là chuyện dung lượng đĩa, **không phải** chuyện tốc độ.
+{mt['soLanLap']} lần lặp tại pool {P}, TỔNG p95 từng lần:
 
-**2. Thành phần lớn nhất không phải CSDL mà là hàng đợi pool.**
-Chờ pool p95 xấu nhất **{qs['choPoolP95XauNhat']:.3f} ms**, gấp
-{qs['choPoolP95XauNhat'] / pq['truyVanP95CanCu']:.1f} lần chi phí truy vấn. Nó **không**
-nằm trong phán quyết trên vì nó là hệ quả của kích thước pool ({mt['pool']} — một giả
-định chưa chốt, xem ADR-0002 C-3), không phải chi phí CSDL. Nhưng nó là phần mà
-người dùng thật sẽ cảm thấy, nên WMS-2 phải chốt con số pool một cách tường minh.
+| Hồ sơ | Số dòng | MB | TỔNG p95 mỗi lần (ms) | Trung vị | Xấu nhất |
+|---|---|---|---|---|---|
+{bang_loat()}
 
-**3. Suy giảm của thành phần khi 200 người đồng thời:
-{qs['suyGiamThanhPhanXauNhat'] * 100:.1f}%** (nền {sach['nenP95XauNhat']:.3f} ms →
-{pq['truyVanP95CanCu']:.3f} ms){' — vượt mốc cảnh báo ' + str(int(ng['mocCanhBaoSuyGiam'] * 100)) + '%.' if qs['canhBaoSuyGiam'] else '.'}
+Các lần lặp bám sát nhau quanh trung vị, **trừ một điểm vọt lẻ** đẩy con số xấu
+nhất lên {pq['tongP95CanCu']:.1f} ms. Điểm vọt đó nằm ở phần **chờ lấy kết nối**
+({qs['choPoolP95XauNhat']:.1f} ms), không phải ở truy vấn
+({qs['truyVanP95XauNhat']:.1f} ms). Chưa quy được nguyên nhân: phép đo chạy trên
+máy lập trình đang mở IDE, không cô lập. **Kết luận ĐẠT dựa trên lần xấu nhất
+quan sát được, không phải trên một cận đã chứng minh.**
+
+## Ba điều số liệu nói
+
+**1. Thành phần lớn nhất là hàng đợi kết nối, không phải CSDL.** Chờ pool xấu
+nhất **{qs['choPoolP95XauNhat']:.1f} ms** so với truy vấn
+**{qs['truyVanP95XauNhat']:.1f} ms**. Tối ưu câu SQL không giải quyết được gì ở
+đây; chỉnh pool và số bản sao mới giải quyết.
+
+**2. Rác trong bảng phiên không ảnh hưởng tốc độ.** Bảng phình lên
+{max(k['bytes'] for k in d['ketQua']) / 1048576:.0f} MB / {max(k['soDong'] for k in d['ketQua']):,}
+dòng, vượt xa `shared_buffers` {mt['sharedBuffers']}, mà TỔNG p95 không xấu đi
+theo. Dọn phiên hết hạn là chuyện **dung lượng đĩa**, không phải tốc độ.
+
+**3. Suy giảm khi {mt['nguoiDongThoi']} người đồng thời:
+{qs['suyGiamKhoang'][0] * 100:.0f}–{qs['suyGiamKhoang'][1] * 100:.0f}%** qua các
+lần lặp{' (vượt mốc cảnh báo ' + str(int(ng['mocCanhBaoSuyGiam'] * 100)) + '%)' if qs['canhBaoSuyGiam'] else ''}.
 **Đây là số liệu, không phải phán quyết NFR-PER-05.** {qs['ghiChuNfrPer05']}
 
 ## Giới hạn — những gì con số này KHÔNG chứng minh
 
-1. **Không có độ trễ mạng.** CSDL cùng máy với tiến trình đo.
-2. **Không đo qua Prisma.** ADR-0001 chọn Prisma 7 + `@prisma/adapter-pg`; chi phí
+1. **Mô hình tải là "cả {mt['nguoiDongThoi']} người ập vào cùng lúc"**, không phải
+   {mt['nguoiDongThoi']} người dùng ở trạng thái ổn định có thời gian nghĩ. Đây là
+   **cận bi quan**: hàng đợi thực tế nhiều khả năng nhẹ hơn. Nó cũng là lý do phần
+   chờ pool áp đảo.
+2. **Không chạm đĩa lần nào.** {qs['khongChamDia']}
+3. **Không có độ trễ mạng** — CSDL cùng máy với tiến trình đo.
+4. **Không đo qua Prisma.** ADR-0001 chọn Prisma 7 + `@prisma/adapter-pg`; chi phí
    lớp ORM chưa nằm trong con số này.
-3. **Chỉ đo lượt ĐỌC.** Việc ghi `thao_tac_cuoi_luc` (gộp 60 giây theo ADR-0002)
-   và nhánh xoá phiên hết hạn khi gặp lúc đọc đều chưa đo.
-4. **Máy lập trình, không phải máy chạy thật** — hạ tầng thật còn chờ OPN-03.
-5. **`shared_buffers` {mt['sharedBuffers']} là mặc định**, chưa phải cấu hình đã chốt.
+5. **Chỉ đo lượt ĐỌC.** Ghi `thao_tac_cuoi_luc` (gộp 60 giây) và nhánh xoá phiên
+   hết hạn khi gặp lúc đọc đều chưa đo.
+6. **Máy lập trình, `shared_buffers` và `max_connections` đều là mặc định** —
+   hạ tầng thật còn chờ OPN-03, và chính nó quyết định hai con số đó.
 
-Kết luận đúng phạm vi: *ADR-0002 không bị bác bởi chi phí truy vấn ở mức đã đo* —
-chưa phải *phương án này chắc chắn đủ nhanh khi chạy thật*.
+Kết luận đúng phạm vi: *ở cấu hình pool {P} trên máy phát triển, chi phí thêm của
+một request nằm dưới trần 50 ms trong mọi lần đo* — chưa phải *phương án này chắc
+chắn đủ nhanh khi chạy thật*.
 
 ## Việc sinh ra từ đây
 
-- ADR-0002 đủ điều kiện chuyển **Accepted** (chủ dự án xác nhận).
-- WMS-2 phải: chốt kích thước pool tường minh, đo lại **qua Prisma**, và mang theo
-  cảnh báo suy giảm {qs['suyGiamThanhPhanXauNhat'] * 100:.0f}% ở mục 3.
+- ADR-0002 Sửa đổi 1: quyết định tạm **pool {P}/bản sao, tối đa 3 bản sao** có số
+  liệu chống lưng → đủ điều kiện để chủ dự án chuyển sang Accepted.
+- WMS-2: đặt kích thước pool tường minh bằng {P}, và đo lại **qua Prisma**.
+- OPN-03 chốt xong thì `max_connections` và số bản sao mới ra con số cuối cùng.
 """
 Path("evd/WMS-1/REPORT.md").write_text(md, encoding="utf-8")
-print(f"REPORT.md sinh từ do-p95.json — {len(md.splitlines())} dòng, 0 con số chép tay")
+print(f"REPORT.md sinh từ do-p95.json — {len(md.splitlines())} dòng")

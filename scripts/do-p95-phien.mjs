@@ -37,10 +37,16 @@ const SUY_GIAM_CANH_BAO = 0.20;           // mốc để BẬT CẢNH BÁO, khô
 
 const NGUOI_DONG_THOI = 200;              // NFR-PER-05
 const LUOT_MOI_NGUOI = 5;
-const POOL = 20;                          // GIẢ ĐỊNH, chưa chốt — xem ADR-0002 C-3
+// ADR-0002 Sửa đổi 1: pool KHÔNG còn là tham số vận hành. Nó là biến khảo sát,
+// và phán quyết đọc ở cấu hình mà ADR đặt tạm.
+const POOL_QUET = [10, 20, 40];
+const POOL_PHAN_QUYET = 20;               // ADR-0002 Sửa đổi 1, quyết định tạm
 const NEN_SO_LUOT = 300;
 const LAM_NONG = 200;
-const SO_LAN_LAP = 5;                     // phán quyết lấy lần XẤU NHẤT
+// 3 lần là quá ít: cùng pool 20 đã thấy 11,1–35,9 ms, tức độ dao động LỚN HƠN
+// biên tới trần. Phán quyết vẫn lấy lần xấu nhất, nhưng báo cáo phải cho thấy cả
+// trung vị và toàn bộ dãy để người đọc tự thấy con số ổn định tới đâu.
+const SO_LAN_LAP = 7;
 const SCHEMA = 'wms1_do_thu';
 
 // Hai hồ sơ dữ liệu để trả lời câu "rác có tác dụng không" bằng số, thay vì
@@ -84,11 +90,17 @@ async function donDep(c, { onao = true } = {}) {
   try {
     // lock_timeout: R2 dựng một session giữ ACCESS EXCLUSIVE và bản cũ treo bằng
     // đúng thời gian khoá — treo lâu thì người ta Ctrl-C, và rác ở lại vĩnh viễn.
-    await c.query("SET lock_timeout = '5s'");
-    await c.query("SET statement_timeout = '30s'");
+    // SET LOCAL, không SET: bản trước đặt lên SESSION nên câu INSERT 2 triệu dòng
+    // sau đó thừa hưởng statement_timeout=30s — mà nó mất 26,2 s, dư 15%. R1 gặp
+    // 3 lần script chết ở đúng đó. SET LOCAL chỉ sống trong transaction này.
+    await c.query('BEGIN');
+    await c.query("SET LOCAL lock_timeout = '5s'");
+    await c.query("SET LOCAL statement_timeout = '30s'");
     await c.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
+    await c.query('COMMIT');
     if (onao) console.log(`đã dọn schema ${SCHEMA}`);
   } catch (e) {
+    await c.query('ROLLBACK').catch(() => {});
     console.error(`⚠️  KHÔNG dọn được schema ${SCHEMA}: ${e.message}`);
     console.error(`    dọn tay: DROP SCHEMA ${SCHEMA} CASCADE;`);
   }
@@ -146,14 +158,14 @@ async function dungDuLieu(c, hs) {
 
 // Đúng đường đi ADR-0002 §Quyết định 2 mô tả, cộng VaiTro mà NFR-SEC-04 bắt buộc.
 const SQL = (s) => `
-  SELECT p.id, p.nguoi_dung_id, p.kho_hien_tai_id, p.thao_tac_cuoi_luc,
+  SELECT p.id, p.nguoi_dung_id, p.kho_hien_tai_id, p.tao_luc, p.thao_tac_cuoi_luc,
          p.het_han_luc, p.dia_chi_ip, u.dang_hoat_dong, v.ma AS vai_tro
     FROM ${s}.phien p
     JOIN ${s}.nguoi_dung u ON u.id = p.nguoi_dung_id
     JOIN ${s}.vai_tro    v ON v.id = u.vai_tro_id
    WHERE p.id = $1 AND p.het_han_luc > now() AND u.dang_hoat_dong`;
 
-async function doMotLan(url, maPhien, lan) {
+async function doMotLan(url, maPhien, lan, pool_n) {
   const sql = SQL(SCHEMA);
   const boc = (i) => maPhien[(i * 7919 + lan * 104729) % maPhien.length]; // phủ đều, tất định
   let dem = 0;
@@ -176,22 +188,24 @@ async function doMotLan(url, maPhien, lan) {
   // PHA B — 200 người đồng thời. Pool ĐƯỢC LÀM NÓNG trước, và thời gian chờ pool
   // được đo TÁCH khỏi thời gian truy vấn: chờ pool là hệ quả của kích thước pool
   // (tham số ứng dụng), không phải chi phí CSDL mà ADR-0002 hỏi.
-  const pool = new Pool({ connectionString: url, max: POOL });
-  const tCho = [], tTruyVan = [];
+  const pool = new Pool({ connectionString: url, max: pool_n });
+  const tCho = [], tTruyVan = [], tTong = [];
   try {
-    const nong = await Promise.all(Array.from({ length: POOL }, () => pool.connect()));
+    const nong = await Promise.all(Array.from({ length: pool_n }, () => pool.connect()));
     await Promise.all(nong.map((cl) => cl.query('SELECT 1')));
     nong.forEach((cl) => cl.release());
 
     const mot = async (u) => {
       for (let i = 0; i < LUOT_MOI_NGUOI; i++) {
+        // Ba con số ĐỒNG BỘ theo từng lượt. Bản trước chỉ giữ hai mảng RỜI nên
+        // p95 của tổng không khôi phục được từ bằng chứng — đúng finding MỚI-1.
         const t0 = process.hrtime.bigint();
         const cl = await pool.connect();
-        tCho.push(ms(t0));
+        const cho = ms(t0);
         try {
           const t1 = process.hrtime.bigint();
           const r = await cl.query(sql, [boc(u * 31 + i)]);
-          tTruyVan.push(ms(t1));
+          tCho.push(cho); tTruyVan.push(ms(t1)); tTong.push(ms(t0));
           if (r.rowCount !== 1) throw new Error('pha tải: lượt đọc không trúng phiên');
         } finally { cl.release(); }
       }
@@ -202,7 +216,11 @@ async function doMotLan(url, maPhien, lan) {
     if (loi) throw loi.reason;
   } finally { await pool.end(); }
 
-  return { nen: tomTat(tNen), choPool: tomTat(tCho), truyVanTai: tomTat(tTruyVan) };
+  // suyGiam tính TRONG CÙNG một lần lặp — bản trước ghép max của lần này với max
+  // của lần khác, tức tỉ số của hai tổng thể không cùng nguồn (finding CHẶN 5).
+  const tomNen = tomTat(tNen), tomTong = tomTat(tTong);
+  return { nen: tomNen, choPool: tomTat(tCho), truyVanTai: tomTat(tTruyVan),
+           tong: tomTong, suyGiamTrongLan: (tomTong.p95 - tomNen.p95) / tomNen.p95 };
 }
 
 let khachDon = null;   // dùng cho handler tín hiệu
@@ -230,70 +248,107 @@ async function main() {
     const { rows: [moiTruong] } = await c.query(
       `SELECT version() AS pg, current_setting('shared_buffers') AS sb`);
 
+    // Rào chắn MỚI-3: pool >= max_connections làm Promise.all(connect) bị từ chối
+    // một phần, client đã lấy không bao giờ release, pool.end() không bao giờ
+    // resolve -> treo vô hạn VÀ chiếm sạch kết nối, cả máy không ai vào CSDL được.
+    const { rows: [mc] } = await c.query('SHOW max_connections');
+    const tran = Number(mc.max_connections) - 10;   // chừa 10 cho quản trị
+    const quaTay = POOL_QUET.filter((n) => n >= tran);
+    if (quaTay.length) {
+      throw new Error(`từ chối chạy: pool ${quaTay.join(', ')} >= max_connections `
+        + `${mc.max_connections} trừ dự phòng. Cấu hình này không làm chậm, nó làm `
+        + `treo tiến trình và chiếm sạch kết nối của CSDL.`);
+    }
+
     const ketQua = [];
     for (const hs of HO_SO) {
       await donDep(c, { onao: false });
       process.stdout.write(`\nhồ sơ ${hs.ten}: dựng dữ liệu…`);
       const { maPhien, bytes, soDong } = await dungDuLieu(c, hs);
       console.log(` ${soDong.toLocaleString('vi')} dòng, ${(bytes / 1048576).toFixed(1)} MB`);
-      const lan = [];
-      for (let i = 0; i < SO_LAN_LAP; i++) {
-        const r = await doMotLan(url, maPhien, i);
-        lan.push(r);
-        console.log(`  lần ${i + 1}: nền p95 ${r.nen.p95.toFixed(3)} ms · `
-          + `truy vấn khi tải p95 ${r.truyVanTai.p95.toFixed(3)} ms · `
-          + `chờ pool p95 ${r.choPool.p95.toFixed(3)} ms`);
+      for (const pn of POOL_QUET) {
+        const lan = [];
+        for (let i = 0; i < SO_LAN_LAP; i++) lan.push(await doMotLan(url, maPhien, i, pn));
+        const tongP95 = lan.map((x) => x.tong.p95);
+        const suyGiam = lan.map((x) => x.suyGiamTrongLan);
+        const xau = Math.max(...tongP95);
+        const tv = [...tongP95].sort((a, b) => a - b)[Math.floor(tongP95.length / 2)];
+        console.log(`  pool ${String(pn).padStart(2)}: TỔNG p95 mỗi lần `
+          + `${tongP95.map((x) => x.toFixed(1)).join(' ')} → trung vị ${tv.toFixed(1)}, `
+          + `xấu nhất ${xau.toFixed(1)} ms`
+          + `  (truy vấn ${Math.max(...lan.map((x) => x.truyVanTai.p95)).toFixed(2)}, `
+          + `chờ ${Math.max(...lan.map((x) => x.choPool.p95)).toFixed(2)})`);
+        const sx = [...tongP95].sort((a, b) => a - b);
+        ketQua.push({ hoSo: hs.ten, soDong, bytes, pool: pn, lan,
+                      tongP95XauNhat: xau,
+                      tongP95TrungVi: sx[Math.floor(sx.length / 2)],
+                      tongP95MoiLan: tongP95,
+                      suyGiamKhoang: [Math.min(...suyGiam), Math.max(...suyGiam)] });
       }
-      // Phán quyết theo lần XẤU NHẤT, không phải một lần chạy may mắn.
-      const xauNhat = Math.max(...lan.map((x) => x.truyVanTai.p95));
-      const nenXau = Math.max(...lan.map((x) => x.nen.p95));
-      const suyGiam = (xauNhat - nenXau) / nenXau;
-      ketQua.push({ hoSo: hs.ten, soDong, bytes, lan, truyVanTaiP95XauNhat: xauNhat,
-                    nenP95XauNhat: nenXau, suyGiamTyLe: suyGiam });
-      console.log(`  → xấu nhất trong ${SO_LAN_LAP} lần: truy vấn p95 = ${xauNhat.toFixed(3)} ms `
-        + `(nền ${nenXau.toFixed(3)} ms, suy giảm ${(suyGiam * 100).toFixed(1)}%)`);
     }
-    const canCu = Math.max(...ketQua.map((k) => k.truyVanTaiP95XauNhat));
-    const suyGiamXau = Math.max(...ketQua.map((k) => k.suyGiamTyLe));
-    const choPoolXau = Math.max(...ketQua.flatMap((k) => k.lan.map((l) => l.choPool.p95)));
+
+    // Phán quyết đọc ở ĐÚNG cấu hình mà ADR-0002 Sửa đổi 1 đặt tạm, và đọc trên
+    // TỔNG (chờ + truy vấn) vì A4 đã chốt trần 50 ms gồm cả chi phí lấy kết nối.
+    const oPhanQuyet = ketQua.filter((k) => k.pool === POOL_PHAN_QUYET);
+    if (!oPhanQuyet.length) throw new Error('không có cấu hình phán quyết trong bộ quét');
+    const canCu = Math.max(...oPhanQuyet.map((k) => k.tongP95XauNhat));
     const datNganSach = canCu <= NGUONG_MS;
-    const canhBaoSuyGiam = suyGiamXau > SUY_GIAM_CANH_BAO;
+    const suyGiamKhoang = [
+      Math.min(...oPhanQuyet.flatMap((k) => k.suyGiamKhoang)),
+      Math.max(...oPhanQuyet.flatMap((k) => k.suyGiamKhoang))];
+    const canhBaoSuyGiam = suyGiamKhoang[1] > SUY_GIAM_CANH_BAO;
+    const choPoolXau = Math.max(...oPhanQuyet.flatMap((k) => k.lan.map((l) => l.choPool.p95)));
+    const truyVanXau = Math.max(...oPhanQuyet.flatMap((k) => k.lan.map((l) => l.truyVanTai.p95)));
+    // Bằng chứng cho quy tắc pool của ADR: TỔNG thay đổi thế nào theo pool.
+    const theoPool = POOL_QUET.map((pn) => ({
+      pool: pn,
+      tongP95XauNhat: Math.max(...ketQua.filter((k) => k.pool === pn).map((k) => k.tongP95XauNhat)),
+      tongP95TrungViXau: Math.max(...ketQua.filter((k) => k.pool === pn).map((k) => k.tongP95TrungVi)),
+    }));
 
     const bangChung = {
-      ticket: 'WMS-1', ngay: new Date().toISOString(), lanViet: 2,
+      ticket: 'WMS-1', ngay: new Date().toISOString(), lanViet: 3,
+      docTheo: 'TỔNG chờ pool + truy vấn — A4 (2026-08-19) chốt trần 50 ms GỒM chi '
+        + 'phí lấy kết nối; ADR-0002 Sửa đổi 1',
       moiTruong: { pg: moiTruong.pg.split(',')[0], sharedBuffers: moiTruong.sb,
-                   host: dich.host, db: dich.db, pool: POOL,
-                   nguoiDongThoi: NGUOI_DONG_THOI, soLanLap: SO_LAN_LAP },
+                   maxConnections: mc.max_connections, host: dich.host, db: dich.db,
+                   nguoiDongThoi: NGUOI_DONG_THOI, soLanLap: SO_LAN_LAP,
+                   poolQuet: POOL_QUET, poolPhanQuyet: POOL_PHAN_QUYET },
       nguong: { nganSachMs: NGAN_SACH_MS, tyLeToiDa: TY_LE_TOI_DA, nguongMs: NGUONG_MS,
                 mocCanhBaoSuyGiam: SUY_GIAM_CANH_BAO },
       ketQua,
+      theoPool,
       phanQuyet: {
-        // Phán quyết DUY NHẤT mà phép đo này có tư cách đưa ra.
-        truyVanP95CanCu: canCu, datNganSachAdr0002: datNganSach,
-        ket: datNganSach ? 'DAT' : 'TRUOT',
+        poolPhanQuyet: POOL_PHAN_QUYET, tongP95CanCu: canCu,
+        datNganSachAdr0002: datNganSach, ket: datNganSach ? 'DAT' : 'TRUOT',
       },
       quanSat: {
-        // Số liệu, không phải phán quyết.
-        suyGiamThanhPhanXauNhat: suyGiamXau, canhBaoSuyGiam,
-        choPoolP95XauNhat: choPoolXau,
+        suyGiamKhoang, canhBaoSuyGiam,
+        choPoolP95XauNhat: choPoolXau, truyVanP95XauNhat: truyVanXau,
         ghiChuNfrPer05: 'NFR-PER-05 là tiêu chí ở mức màn hình (thời gian phản hồi '
           + 'đầu cuối). Phép đo này đo một thành phần nên KHÔNG kết luận đạt/trượt '
           + 'NFR-PER-05. Con số suy giảm ở đây là cảnh báo mang sang WMS-2.',
+        khongChamDia: 'EXPLAIN (ANALYZE, BUFFERS) trên bộ 2 triệu dòng cho shared '
+          + 'hit, read=0 — toàn bộ tập nóng nằm trong shared_buffers. Phép đo này '
+          + 'KHÔNG chạm đĩa lần nào.',
       },
     };
     mkdirSync('evd/WMS-1', { recursive: true });
     writeFileSync('evd/WMS-1/do-p95.json', JSON.stringify(bangChung, null, 2) + '\n');
 
     console.log(`\n=== PHÁN QUYẾT (lần xấu nhất trên mọi hồ sơ và mọi lần lặp) ===`);
-    console.log(`truy vấn p95 căn cứ : ${canCu.toFixed(3)} ms / ngưỡng ${NGUONG_MS} ms`
-      + `  -> ADR-0002 ${datNganSach ? 'ĐẠT' : 'TRƯỢT'}`);
+    console.log(`TỔNG p95 (chờ + truy vấn) tại pool ${POOL_PHAN_QUYET}: ${canCu.toFixed(3)} ms`
+      + ` / trần ${NGUONG_MS} ms  -> ADR-0002 ${datNganSach ? 'ĐẠT' : 'TRƯỢT'}`);
+    console.log(`  thành phần xấu nhất: chờ pool ${choPoolXau.toFixed(3)} ms · `
+      + `truy vấn ${truyVanXau.toFixed(3)} ms`);
+    console.log(`  theo pool (trung vị / xấu nhất): `
+      + theoPool.map((x) => `${x.pool}→${x.tongP95TrungViXau.toFixed(1)}/${x.tongP95XauNhat.toFixed(1)}ms`).join(' · '));
     console.log(`\n--- quan sát, KHÔNG phải phán quyết ---`);
-    console.log(`suy giảm của thành phần CSDL khi 200 người: ${(suyGiamXau * 100).toFixed(1)}%`
+    console.log(`suy giảm khi 200 người, KHOẢNG qua các lần lặp: `
+      + `${(suyGiamKhoang[0] * 100).toFixed(0)}–${(suyGiamKhoang[1] * 100).toFixed(0)}%`
       + `${canhBaoSuyGiam ? '  ⚠️  vượt mốc cảnh báo ' + SUY_GIAM_CANH_BAO * 100 + '%' : ''}`);
-    console.log(`chờ pool p95 xấu nhất : ${choPoolXau.toFixed(3)} ms — LỚN HƠN chi phí truy vấn`);
-    console.log(`  vài lần. Đây là hệ quả của kích thước pool (${POOL}, giả định chưa chốt),`);
-    console.log(`  không phải chi phí CSDL, nên không nằm trong phán quyết trên — nhưng nó`);
-    console.log(`  là thành phần lớn nhất mà người dùng thật sẽ cảm thấy. WMS-2 phải chốt nó.`);
+    console.log(`chờ pool giờ NẰM TRONG phán quyết (A4). Nó vẫn là thành phần lớn nhất,`);
+    console.log(`  nên chỉnh pool mới giải quyết được, tối ưu truy vấn thì không.`);
     console.log(`NFR-PER-05 là tiêu chí ở mức MÀN HÌNH; chưa có màn hình nào nên phép đo này`);
     console.log(`  không đủ tư cách kết luận đạt/trượt nó.`);
     console.log(`bằng chứng: evd/WMS-1/do-p95.json (ghi từ chính lần chạy này)`);
