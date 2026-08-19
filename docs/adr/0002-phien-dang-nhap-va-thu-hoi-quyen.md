@@ -1,6 +1,6 @@
 # ADR-0002 — Phiên đăng nhập lưu phía máy chủ, thu hồi quyền tức thời
 
-- **Trạng thái:** **MỞ LẠI 2026-08-19** (xem §Sửa đổi 1) — vẫn Proposed, chấp nhận là quyền của chủ dự án
+- **Trạng thái:** **MỞ LẠI 2026-08-19** (xem §Sửa đổi 1 và §Sửa đổi 2) — vẫn Proposed, chấp nhận là quyền của chủ dự án
 - **Ngày:** 19/08/2026
 - **Bối cảnh tài liệu:** SRS §2.3, §4.1 (FR-01-06, FR-01-07), §7.1 (NFR-PER-02,
   NFR-PER-05), §7.3 (NFR-SEC-01, NFR-SEC-04, NFR-SEC-08); SRD BR-22; ADR-0001
@@ -198,3 +198,56 @@ gồm cả thời gian chờ lấy kết nối**, và ở tải 200 người đ�
 chờ pool là thành phần LỚN HƠN chi phí truy vấn vài lần** (WMS-1 đo: truy vấn p95
 ~2 ms, chờ pool p95 10–18 ms ở lần chạy bình thường). Tối ưu truy vấn không giải
 quyết được gì; chỉnh pool mới giải quyết.
+
+
+---
+
+# Sửa đổi 2 — 2026-08-19: điều kiện phải PHỦ ĐỊNH ĐƯỢC
+
+## Vì sao phải sửa tiếp
+
+Sửa đổi 1 viết điều kiện xác nhận là *"p95 của TỔNG ≤ 50 ms, đo qua nhiều lần lặp
+và **lấy lần xấu nhất**"*. Reviewer R1 chỉ ra điều kiện đó **hỏng từ gốc**, và
+chứng minh bằng cách đổi đúng một hằng số trong harness — `SO_LAN_LAP` từ 7 lên
+60, không sửa một dòng code nào:
+
+```
+TỔNG p95 tại pool 20: 81.145 ms / trần 50 ms  ->  ADR-0002 TRƯỢT   EXIT=1
+```
+
+Lý do: **kỳ vọng của một giá trị lớn nhất tăng đơn điệu theo số lần lấy mẫu.**
+Một tiêu chí dựa trên `max` không đo hệ thống, nó đo *người ta nhìn bao lâu*. Gộp
+296 lần lặp, R1 đo được tỉ lệ request vượt trần là 1/296 ≈ 0,3%, và từ đó tính ra
+**~95% số lần chạy 14 lần lặp sẽ in ra ĐẠT** kể cả khi đuôi phân phối thật sự
+vượt trần. Điều kiện như vậy không phủ định được thì không phải là điều kiện.
+
+## Điều kiện xác nhận, viết lại
+
+**ADR-0002 được xác nhận khi, tại cấu hình pool đã chốt:**
+
+1. **p95 GỘP trên toàn bộ request của phép đo ≤ 50 ms** — gộp mọi lần lặp và mọi
+   hồ sơ dữ liệu thành MỘT mẫu, không lấy max của các p95 con.
+2. **Cỡ mẫu ≥ 5.000 request**, để "chạy ít cho đẹp" không còn là một chiến lược.
+   Harness tự đỏ nếu mẫu nhỏ hơn.
+3. **Báo kèm p99, max và số request vượt trần** — phần đuôi phải nhìn thấy được,
+   không được giấu sau một con số p95.
+
+Con số `max p95 qua các lần lặp` vẫn được ghi trong bằng chứng để đối chiếu,
+nhưng **không dùng để phán quyết**. Ghi rõ điều đó trong JSON.
+
+## Về phần đuôi — đừng quy sai chỗ
+
+R1 đo tương quan giữa "chờ pool p95" và "truy vấn max" trong cùng một lần lặp:
+**r = 0,920**. Nghĩa là những lần vọt không phải hiện tượng hàng đợi của pool —
+chúng là **cú khựng của cả máy**, kéo theo cả hai thành phần cùng lúc. Vì vậy câu
+"chỉnh pool mới giải quyết được, tối ưu truy vấn thì không" đúng cho phần thân
+phân phối và **sai cho phần đuôi**. Trên hạ tầng thật (OPN-03), phần đuôi sẽ do
+nhiễu của môi trường đó quyết định, không do thiết kế này quyết định.
+
+## Điều Sửa đổi 1 nói mà số liệu KHÔNG chống lưng
+
+Sửa đổi 1 viết *"pool lớn hơn không tốt hơn"* dựa trên một lần chạy. R1 kiểm bằng
+Mann-Whitney trên 56 lần lặp mỗi pool: **pool 20 tốt hơn pool 40 thật (p ≈ 1,2e-06)**,
+nhưng **pool 10 và pool 20 thì không phân biệt được (p ≈ 0,63)**. Vậy phát biểu
+đúng là: *pool 40 tệ hơn pool 20; pool 10 và 20 tương đương ở phép đo này.* Chọn
+20 vì nó cho nhiều dư địa hơn khi số bản sao tăng, không phải vì nó nhanh hơn 10.

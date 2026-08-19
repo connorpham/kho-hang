@@ -34,6 +34,12 @@ const NGUONG_MS = NGAN_SACH_MS * TY_LE_TOI_DA;
 // cuối sau này. Bản viết đầu trích tên NFR-PER-05 rồi bỏ qua tiêu chí; sửa nó
 // thành một phán quyết đạt/trượt cũng sai y như vậy, chỉ theo hướng ngược lại.
 const SUY_GIAM_CANH_BAO = 0.20;           // mốc để BẬT CẢNH BÁO, không phải để phán quyết
+// R1 chứng minh tiêu chí cũ (max qua các lần lặp) hỏng từ gốc: kỳ vọng của max
+// TĂNG THEO SỐ LẦN NHÌN, nên nó đo thời lượng đo chứ không đo hệ thống. Đổi
+// SO_LAN_LAP 7 -> 60 là phán quyết lật (81,1 ms, TRƯỢT) mà không sửa một dòng
+// code nào. Tiêu chí mới: p95 GỘP trên toàn bộ request của lần chạy, kèm cỡ mẫu
+// tối thiểu để "chạy ít cho đẹp" không còn là một chiến lược.
+const SO_MAU_TOI_THIEU = 5000;
 
 const NGUOI_DONG_THOI = 200;              // NFR-PER-05
 const LUOT_MOI_NGUOI = 5;
@@ -191,9 +197,21 @@ async function doMotLan(url, maPhien, lan, pool_n) {
   const pool = new Pool({ connectionString: url, max: pool_n });
   const tCho = [], tTruyVan = [], tTong = [];
   try {
-    const nong = await Promise.all(Array.from({ length: pool_n }, () => pool.connect()));
-    await Promise.all(nong.map((cl) => cl.query('SELECT 1')));
-    nong.forEach((cl) => cl.release());
+    // allSettled, KHÔNG all: nếu CSDL hết chỗ thì một phần connect() bị từ chối,
+    // và những client ĐÃ lấy được sẽ không bao giờ release -> pool.end() không bao
+    // giờ resolve -> treo vô hạn, chiếm sạch kết nối. R1 tái hiện được ở cả pool 20
+    // lẫn pool 40 bằng cách giữ 74-85 kết nối từ tiến trình khác, tức rào chắn theo
+    // con số cấu hình là chưa đủ: cái quyết định là số chỗ CÒN TRỐNG lúc chạy.
+    const kq0 = await Promise.allSettled(Array.from({ length: pool_n }, () => pool.connect()));
+    const lay = kq0.filter((x) => x.status === 'fulfilled').map((x) => x.value);
+    const hong = kq0.find((x) => x.status === 'rejected');
+    if (hong) {
+      lay.forEach((cl) => cl.release());
+      throw new Error(`làm nóng pool ${pool_n} thất bại: ${hong.reason.message}. `
+        + `CSDL không còn đủ chỗ trống — giảm pool hoặc dừng tiến trình khác.`);
+    }
+    await Promise.all(lay.map((cl) => cl.query('SELECT 1')));
+    lay.forEach((cl) => cl.release());
 
     const mot = async (u) => {
       for (let i = 0; i < LUOT_MOI_NGUOI; i++) {
@@ -218,12 +236,21 @@ async function doMotLan(url, maPhien, lan, pool_n) {
 
   // suyGiam tính TRONG CÙNG một lần lặp — bản trước ghép max của lần này với max
   // của lần khác, tức tỉ số của hai tổng thể không cùng nguồn (finding CHẶN 5).
-  const tomNen = tomTat(tNen), tomTong = tomTat(tTong);
-  return { nen: tomNen, choPool: tomTat(tCho), truyVanTai: tomTat(tTruyVan),
-           tong: tomTong, suyGiamTrongLan: (tomTong.p95 - tomNen.p95) / tomNen.p95 };
+  const tomNen = tomTat(tNen), tomTong = tomTat(tTong), tomTV = tomTat(tTruyVan);
+  return { nen: tomNen, choPool: tomTat(tCho), truyVanTai: tomTV, tong: tomTong,
+           // So CÙNG LOẠI: truy vấn dưới tải với truy vấn nền, cả hai đều không
+           // gồm chờ pool. Bản trước lấy tổng (có hàng đợi) chia cho nền (không
+           // có), nên con số 17793% chỉ nói rằng tử và mẫu khác đơn vị.
+           suyGiamTruyVan: (tomTV.p95 - tomNen.p95) / tomNen.p95,
+           tho: { tong: tTong, cho: tCho, truyVan: tTruyVan } };
 }
 
-let khachDon = null;   // dùng cho handler tín hiệu
+// Handler tín hiệu KHÔNG được dùng chung kết nối với pha dựng dữ liệu. R2 chứng
+// minh: SIGINT rơi vào giữa câu INSERT 25 giây thì lệnh dọn bị xếp hàng sau nó rồi
+// đua với ANALYZE/SELECT trên cùng client — 2/3 lần chạy in "đã dọn schema" trong
+// khi 2.000.200 dòng vẫn còn nguyên. Một lời nói dối tệ hơn cả việc để lại rác.
+// Vì vậy: mở kết nối MỚI để dọn, đừng mượn kết nối đang bận.
+let urlToanCuc = null;
 // Chỉ dọn khi CHÍNH script này đã tạo schema. Nếu rào chắn từ chối vì schema có
 // sẵn của người khác thì tuyệt đối không được đụng vào nó — từ chối rồi lại xoá
 // còn tệ hơn là xoá thẳng.
@@ -235,8 +262,15 @@ async function main() {
 
   const c = new Client({ connectionString: url, connectionTimeoutMillis: 5000 });
   await c.connect();
-  khachDon = c;
+  urlToanCuc = url;
   try {
+    // R1 gặp thật: một bản sao thứ hai của script khởi chạy giữa chừng và donDep
+    // của nó xoá schema đang được đo. Kiểm-rồi-tạo không có khoá là TOCTOU.
+    const { rows: [khoa] } = await c.query('SELECT pg_try_advisory_lock(920260819) AS co');
+    if (!khoa.co) {
+      throw new Error('một tiến trình do-p95-phien khác đang chạy trên CSDL này. '
+        + 'Hai bản sao sẽ giẫm lên schema của nhau — chờ nó xong rồi chạy lại.');
+    }
     const { rows: [co] } = await c.query(
       `SELECT count(*)::int n FROM information_schema.schemata WHERE schema_name = $1`, [SCHEMA]);
     if (co.n > 0 && !process.argv.includes('--ghi-de')) {
@@ -270,7 +304,7 @@ async function main() {
         const lan = [];
         for (let i = 0; i < SO_LAN_LAP; i++) lan.push(await doMotLan(url, maPhien, i, pn));
         const tongP95 = lan.map((x) => x.tong.p95);
-        const suyGiam = lan.map((x) => x.suyGiamTrongLan);
+        const suyGiam = lan.map((x) => x.suyGiamTruyVan);
         const xau = Math.max(...tongP95);
         const tv = [...tongP95].sort((a, b) => a - b)[Math.floor(tongP95.length / 2)];
         console.log(`  pool ${String(pn).padStart(2)}: TỔNG p95 mỗi lần `
@@ -279,11 +313,16 @@ async function main() {
           + `  (truy vấn ${Math.max(...lan.map((x) => x.truyVanTai.p95)).toFixed(2)}, `
           + `chờ ${Math.max(...lan.map((x) => x.choPool.p95)).toFixed(2)})`);
         const sx = [...tongP95].sort((a, b) => a - b);
-        ketQua.push({ hoSo: hs.ten, soDong, bytes, pool: pn, lan,
+        // Giữ mẫu THÔ chỉ ở cấu hình phán quyết: đủ để người khác tính lại bất kỳ
+        // phân vị nào mà không phải tin tóm tắt của tôi, và không làm phình JSON.
+        const tho = pn === POOL_PHAN_QUYET
+          ? lan.flatMap((x) => x.tho.tong).map((x) => Math.round(x * 1000) / 1000) : undefined;
+        lan.forEach((x) => delete x.tho);
+        ketQua.push({ hoSo: hs.ten, soDong, bytes, pool: pn, lan, thoTongMs: tho,
                       tongP95XauNhat: xau,
                       tongP95TrungVi: sx[Math.floor(sx.length / 2)],
                       tongP95MoiLan: tongP95,
-                      suyGiamKhoang: [Math.min(...suyGiam), Math.max(...suyGiam)] });
+                      suyGiamTruyVanKhoang: [Math.min(...suyGiam), Math.max(...suyGiam)] });
       }
     }
 
@@ -291,14 +330,25 @@ async function main() {
     // TỔNG (chờ + truy vấn) vì A4 đã chốt trần 50 ms gồm cả chi phí lấy kết nối.
     const oPhanQuyet = ketQua.filter((k) => k.pool === POOL_PHAN_QUYET);
     if (!oPhanQuyet.length) throw new Error('không có cấu hình phán quyết trong bộ quét');
-    const canCu = Math.max(...oPhanQuyet.map((k) => k.tongP95XauNhat));
+
+    // TIÊU CHÍ MỚI: gộp MỌI request ở cấu hình phán quyết thành một mẫu duy nhất.
+    const mauGop = oPhanQuyet.flatMap((k) => k.thoTongMs);
+    if (mauGop.length < SO_MAU_TOI_THIEU) {
+      throw new Error(`cỡ mẫu ${mauGop.length} < ${SO_MAU_TOI_THIEU} — không đủ để `
+        + `nói gì về p95. Tăng SO_LAN_LAP hoặc NGUOI_DONG_THOI.`);
+    }
+    const gop = tomTat(mauGop);
+    const soVuotTran = mauGop.filter((x) => x > NGUONG_MS).length;
+    const canCu = gop.p95;
     const datNganSach = canCu <= NGUONG_MS;
+    const maxQuaCacLan = Math.max(...oPhanQuyet.map((k) => k.tongP95XauNhat));
     const suyGiamKhoang = [
-      Math.min(...oPhanQuyet.flatMap((k) => k.suyGiamKhoang)),
-      Math.max(...oPhanQuyet.flatMap((k) => k.suyGiamKhoang))];
+      Math.min(...oPhanQuyet.flatMap((k) => k.suyGiamTruyVanKhoang)),
+      Math.max(...oPhanQuyet.flatMap((k) => k.suyGiamTruyVanKhoang))];
     const canhBaoSuyGiam = suyGiamKhoang[1] > SUY_GIAM_CANH_BAO;
     const choPoolXau = Math.max(...oPhanQuyet.flatMap((k) => k.lan.map((l) => l.choPool.p95)));
     const truyVanXau = Math.max(...oPhanQuyet.flatMap((k) => k.lan.map((l) => l.truyVanTai.p95)));
+
     // Bằng chứng cho quy tắc pool của ADR: TỔNG thay đổi thế nào theo pool.
     const theoPool = POOL_QUET.map((pn) => ({
       pool: pn,
@@ -319,11 +369,20 @@ async function main() {
       ketQua,
       theoPool,
       phanQuyet: {
-        poolPhanQuyet: POOL_PHAN_QUYET, tongP95CanCu: canCu,
-        datNganSachAdr0002: datNganSach, ket: datNganSach ? 'DAT' : 'TRUOT',
+        thongKe: 'p95 GỘP trên toàn bộ request ở cấu hình phán quyết',
+        poolPhanQuyet: POOL_PHAN_QUYET, coMau: mauGop.length, coMauToiThieu: SO_MAU_TOI_THIEU,
+        gopP50: gop.p50, gopP95: gop.p95, gopP99: gop.p99, gopMax: gop.max,
+        soRequestVuotTran: soVuotTran, tyLeVuotTran: soVuotTran / mauGop.length,
+        tongP95CanCu: canCu, datNganSachAdr0002: datNganSach,
+        ket: datNganSach ? 'DAT' : 'TRUOT',
+        maxP95QuaCacLanLap: maxQuaCacLan,
+        ghiChuThongKe: 'Tiêu chí cũ (max p95 qua các lần lặp) đã bị bỏ: kỳ vọng của '
+          + 'max tăng theo số lần lặp nên nó đo thời lượng đo, không đo hệ thống. '
+          + 'Con số đó vẫn được ghi ở maxP95QuaCacLanLap để đối chiếu, KHÔNG dùng '
+          + 'để phán quyết.',
       },
       quanSat: {
-        suyGiamKhoang, canhBaoSuyGiam,
+        suyGiamTruyVanKhoang: suyGiamKhoang, canhBaoSuyGiam,
         choPoolP95XauNhat: choPoolXau, truyVanP95XauNhat: truyVanXau,
         ghiChuNfrPer05: 'NFR-PER-05 là tiêu chí ở mức màn hình (thời gian phản hồi '
           + 'đầu cuối). Phép đo này đo một thành phần nên KHÔNG kết luận đạt/trượt '
@@ -337,14 +396,21 @@ async function main() {
     writeFileSync('evd/WMS-1/do-p95.json', JSON.stringify(bangChung, null, 2) + '\n');
 
     console.log(`\n=== PHÁN QUYẾT (lần xấu nhất trên mọi hồ sơ và mọi lần lặp) ===`);
-    console.log(`TỔNG p95 (chờ + truy vấn) tại pool ${POOL_PHAN_QUYET}: ${canCu.toFixed(3)} ms`
-      + ` / trần ${NGUONG_MS} ms  -> ADR-0002 ${datNganSach ? 'ĐẠT' : 'TRƯỢT'}`);
+    console.log(`p95 GỘP của TỔNG trên ${mauGop.length} request tại pool ${POOL_PHAN_QUYET}: `
+      + `${canCu.toFixed(3)} ms / trần ${NGUONG_MS} ms  -> ADR-0002 `
+      + `${datNganSach ? 'ĐẠT' : 'TRƯỢT'}`);
+    console.log(`  gộp: p50 ${gop.p50.toFixed(2)} · p95 ${gop.p95.toFixed(2)} · `
+      + `p99 ${gop.p99.toFixed(2)} · max ${gop.max.toFixed(2)} ms · `
+      + `vượt trần ${soVuotTran}/${mauGop.length} request `
+      + `(${(soVuotTran / mauGop.length * 100).toFixed(2)}%)`);
+    console.log(`  (max p95 qua các lần lặp = ${maxQuaCacLan.toFixed(2)} ms — ghi để đối`);
+    console.log(`   chiếu, KHÔNG dùng phán quyết: thống kê đó tăng theo số lần nhìn)`);
     console.log(`  thành phần xấu nhất: chờ pool ${choPoolXau.toFixed(3)} ms · `
       + `truy vấn ${truyVanXau.toFixed(3)} ms`);
     console.log(`  theo pool (trung vị / xấu nhất): `
       + theoPool.map((x) => `${x.pool}→${x.tongP95TrungViXau.toFixed(1)}/${x.tongP95XauNhat.toFixed(1)}ms`).join(' · '));
     console.log(`\n--- quan sát, KHÔNG phải phán quyết ---`);
-    console.log(`suy giảm khi 200 người, KHOẢNG qua các lần lặp: `
+    console.log(`suy giảm TRUY VẤN (cùng loại với nền) khi 200 người, khoảng: `
       + `${(suyGiamKhoang[0] * 100).toFixed(0)}–${(suyGiamKhoang[1] * 100).toFixed(0)}%`
       + `${canhBaoSuyGiam ? '  ⚠️  vượt mốc cảnh báo ' + SUY_GIAM_CANH_BAO * 100 + '%' : ''}`);
     console.log(`chờ pool giờ NẰM TRONG phán quyết (A4). Nó vẫn là thành phần lớn nhất,`);
@@ -357,7 +423,7 @@ async function main() {
     // Lỗi giữa chừng cũng phải dọn — lần chạy hỏng đầu tiên của bản này để lại
     // schema y hệt cái mà R2 đã cảnh báo, chỉ khác đường đi (throw thay vì SIGINT).
     if (daTaoSchema) await donDep(c, { onao: false });
-    khachDon = null;
+    urlToanCuc = null;
     await c.end().catch(() => {});
   }
 }
@@ -366,8 +432,15 @@ async function main() {
 for (const [tin, ma] of [['SIGINT', 130], ['SIGTERM', 143]]) {
   process.once(tin, async () => {
     console.error(`\n${tin} — đang dọn trước khi thoát…`);
-    if (khachDon && daTaoSchema) await donDep(khachDon).catch(() => {});
-    await khachDon?.end().catch(() => {});
+    if (daTaoSchema && urlToanCuc) {
+      const rieng = new Client({ connectionString: urlToanCuc, connectionTimeoutMillis: 5000 });
+      try {
+        await rieng.connect();
+        await donDep(rieng);
+      } catch (e) {
+        console.error(`⚠️  KHÔNG dọn được: ${e.message} — dọn tay: DROP SCHEMA ${SCHEMA} CASCADE;`);
+      } finally { await rieng.end().catch(() => {}); }
+    }
     process.exit(ma);
   });
 }
