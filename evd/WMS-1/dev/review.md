@@ -88,3 +88,115 @@ Ba cái đau nhất, ghi lại để không lặp:
 - Rào chắn CSDL đích + handler SIGINT/SIGTERM + `lock_timeout` khi dọn + cảnh báo
   khi ghi đè schema có sẵn (R2 CHẶN 1–4).
 - Sinh lại bằng chứng từ **một lần chạy duy nhất**, không ghép tay dòng nào.
+
+---
+
+# VÒNG 2 (re-review) — bản viết lại
+
+## R2 (sonnet) — VERDICT: **APPROVE**
+
+Cả 4 finding chặn vòng 1: **ĐÃ XỬ LÝ**, mỗi cái kèm tái hiện.
+`kill -INT`/`kill -TERM` → schema được dọn, exit 130/143 (`kill -9` vẫn bỏ lại —
+giới hạn hệ điều hành, không runtime nào bắt được SIGKILL). Khoá ACCESS EXCLUSIVE
+15s → thoát sau đúng 5s với `canceling statement due to lock timeout`. Host lạ →
+từ chối **trước khi mở kết nối**; `WMS1_CHO_PHEP_HOST` đúng thì qua. Schema có sẵn
+chứa dữ liệu → từ chối, dữ liệu còn nguyên; `--ghi-de` thì cảnh báo rồi mới xoá.
+
+Ghi nhận không chặn: `:87-88` `SET lock_timeout`/`statement_timeout` áp theo
+SESSION nên `INSERT` 2 triệu dòng sau đó cũng thừa hưởng `statement_timeout=30s`.
+
+**MY WEAK SPOT (R2):** test trên Postgres brew chứ không phải image
+`postgres:17-alpine` của repo; chưa ép lỗi giữa lúc pha tải 200 kết nối đang chạy.
+
+## R1 (opus) — VERDICT: **REQUEST-CHANGES**
+
+Tổng: **6 đã xử lý · 3 nửa vời · 0 chưa đụng** + 4 finding mới.
+Kết luận trung tâm đứng vững: R1 đánh 8 lần, phán quyết **không lật lần nào**
+(6 lần hoàn tất: 1,666 / 1,778 / 1,895 / 1,958 / 4,618 / 8,397 ms trên ngưỡng 50 ms).
+Tái sinh REPORT.md từ JSON đã commit → **byte-identical, 0 dòng lệch** (CHẶN 1 vòng 1
+đã đóng hẳn).
+
+### MỚI-1 · CHẶN — cách đọc điều kiện của ADR-0002 quyết định phán quyết
+
+`docs/adr/0002-...:86-89` viết điều kiện là *"mỗi request cộng thêm một lượt đi
+CSDL … nếu nó ăn quá 10% ngân sách 500 ms"*. **Việc lấy kết nối là một phần của
+lượt đi đó.** Trong 6 lần chạy hoàn tất của R1, **riêng chờ pool p95 đã vượt trần
+50 ms hai lần: 160,246 ms và 56,961 ms** — vượt trước khi cộng một mili giây truy
+vấn nào. Theo cách đọc thẳng của ADR thì 2/6 lần chạy là TRƯỢT.
+
+Việc tách chờ pool khỏi phán quyết — vốn là cách sửa finding vòng 1 — **chính là
+thứ đang giữ phán quyết ở ĐẠT**. Nặng hơn: `:180,205,258` chỉ lưu `tCho` và
+`tTruyVan` thành hai mảng rời, JSON chỉ giữ tóm tắt → **p95 của tổng không khôi
+phục được từ bằng chứng**. Người đọc muốn con số trung thực cũng không tính lại được.
+
+### MỚI-2 · CHẶN nhẹ — harness bằng chứng không chạy lại được ổn định
+
+`:88` đặt `statement_timeout='30s'` lên session rồi `:124-127` INSERT 2 triệu dòng.
+R1 đo tay bằng psql: **INSERT mất 26,185 s** — dư 3,8 s (15%). R1 bắt được **3 lần
+script thoát exit=2 với SQLSTATE 40P01 tại đúng câu lệnh đó**, không sinh ra bằng
+chứng nào. Hỏng an toàn (schema không bị bỏ lại, JSON không bị ghi đè dở), nhưng
+một harness bằng chứng không chạy lại được theo yêu cầu thì vẫn phải sửa.
+
+### MỚI-3 · không chặn ở cấu hình hiện tại, CHẶN cho WMS-2
+
+`:182-184` `Promise.all(POOL × pool.connect())`: khi POOL ≥ `max_connections` (=100)
+một phần `connect()` bị từ chối, **client đã lấy không bao giờ được release,
+`pool.end()` không bao giờ resolve** → treo vô hạn, không output, không exit code.
+R1 chạy POOL=100: treo >75 s, phải `kill -9`, để lại schema, và trong lúc đó **cả
+máy không ai connect được vào CSDL dev** (`FATAL: sorry, too many clients already`).
+Đây đúng là cái bẫy mà REPORT.md bảo WMS-2 đi vào.
+
+### MỚI-4 · không chặn — bệnh cũ tái phát ở quy mô nhỏ
+
+`REPORT.md:60,81` ghi suy giảm **624%** và bảo WMS-2 mang theo con số đó; 6 lần chạy
+của R1 cho 454,1 / 486,2 / 509,8 / 528,9 / 536,9 / 581,3 / 1009,8 %. `:53-54` ghi chờ
+pool "gấp 6,1 lần"; R1 đo 6,2x–19,1x. Dấu hiệu định tính thì ổn định (cảnh báo 20%
+bật 100% số lần chạy); con số lẻ tới một chữ số thập phân thì không.
+
+### Ba finding vòng 1 mới xử lý nửa vời
+
+- **CHẶN 3b** — POOL vẫn là hằng số cứng `:40`, chỉ được dán nhãn "GIẢ ĐỊNH". Vòng 1
+  đòi coi nó là **biến khảo sát**. R1 quét: POOL=5 → căn cứ 0,629 ms · POOL=20 →
+  2,466 ms — **3,9 lần chênh chỉ vì đổi một hằng số**.
+- **CHẶN 5** — phán quyết đã sạch (max của cùng một thống kê), nhưng `:248-250`
+  `suyGiamTyLe` vẫn ghép max(truyVanTai.p95) của **lần 5** ÷ max(nen.p95) của **lần 2**.
+- **Ghi nhận 8** — entropy ✓, rác trả lời bằng số ✓, nhưng **"dữ liệu nằm gọn trong
+  cache" vẫn đúng nguyên và vẫn không có trong mục Giới hạn**. R1 đo trực tiếp:
+  `EXPLAIN (ANALYZE, BUFFERS)` trên bộ 2.000.200 dòng / 506 MB → `shared hit=10,
+  read=0, Execution Time 0.030 ms`. **Phép đo không chạm đĩa một lần nào.**
+
+*Nit:* `evd/WMS-1/do-p95.json` chưa `git add` — toàn bộ lập luận "bằng chứng máy
+ghi" sụp nếu file không đi cùng PR.
+
+**MY WEAK SPOT (R1):** không truy được đối tác khoá của deadlock 40P01; 3 lần hỏng
+dồn vào 3 lần thử đầu nên không loại trừ được nhiễu môi trường. Con số chờ pool
+160 ms / 57 ms đo trên máy lập trình đang mở IDE, không cô lập. Không đo được p95
+của tổng vì script không lưu cặp giá trị, nên lập luận MỚI-1 phải đứng trên "riêng
+chờ pool đã vượt trần" chứ không đứng trên số đầu-cuối thật.
+
+---
+
+## Phản hồi của tác giả (vòng 2) — không có vòng ba
+
+Không tranh luận điểm nào. Cả bốn finding mới đều đứng.
+
+**MỚI-1 không phải lỗi code, nó là câu hỏi về cách đọc ADR-0002 — và đó không phải
+việc tôi tự quyết.** "Một lượt đi CSDL" có gồm việc lấy kết nối hay không:
+- Gồm → 2/6 lần chạy TRƯỢT, ADR-0002 phải mở lại, và kích thước pool trở thành một
+  quyết định kiến trúc chứ không phải tham số vận hành.
+- Không gồm → phán quyết ĐẠT đứng, nhưng ADR phải nói thẳng rằng chi phí lấy kết
+  nối nằm ngoài trần 50 ms và phải có trần riêng cho nó.
+
+Trớ trêu là vòng 1 bảo tôi đang đo cái harness, vòng 2 bảo việc tách ra đã loại một
+chi phí có thật khỏi phán quyết. Cả hai đều đúng, và điểm chung là con số này vô
+nghĩa cho tới khi kích thước pool được chốt — đúng thứ R1 đòi từ vòng 1 (CHẶN 3b)
+mà tôi đẩy sang WMS-2.
+
+**Đã hết vòng phản biện.** WMS-1 có dòng hỏng thứ hai → theo loop guard #3, máy
+không tự chọn lại nữa; chuyển sang mục việc-của-chủ-dự-án kèm cả hai lý do hỏng.
+Tôi KHÔNG sửa CODE ĐO sau vòng review này: MỚI-1 có thể đổi hẳn thứ phải đo (lưu
+cặp giá trị theo từng lượt, báo cả hai cách đọc), nên sửa trước khi biết cách đọc
+nào đúng chỉ là đoán. Thay đổi DUY NHẤT tôi làm sau vòng review là gắn khối cảnh
+báo lên đầu REPORT.md (qua trình sinh, không chép tay số nào) — để một phán quyết
+đang bị tranh cãi không đứng đó như một sự thật đã chốt. Đó là sửa tính trung
+thực, không phải sửa finding.

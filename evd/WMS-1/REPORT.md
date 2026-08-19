@@ -1,85 +1,95 @@
-# WMS-1 — Đo p95 lượt đọc phiên (điều kiện chốt ADR-0002)
+# WMS-1 — Chi phí lượt đọc phiên (điều kiện chốt ADR-0002)
 
-> # ⛔ KẾT LUẬN ĐÃ BỊ RÚT LẠI — 2026-08-19
+> # ⚠️ PHÁN QUYẾT ĐANG BỊ TRANH CÃI — vòng review 2, 2026-08-19
 >
-> Vòng review 2 người **bác bỏ** báo cáo này. Con số 22,363 ms / 4,47% dưới đây
-> **không được dùng để chốt ADR-0002**. Ba lý do đủ để tự nó đứng:
+> Reviewer R1 chỉ ra: điều kiện của ADR-0002 nói *"mỗi request cộng thêm một lượt
+> đi CSDL"*, mà **việc lấy kết nối là một phần của lượt đi đó**. Báo cáo này loại
+> chờ pool ra khỏi phán quyết — và chính việc loại đó giữ phán quyết ở ĐẠT.
+> R1 đo được **riêng chờ pool p95 vượt trần 50 ms ở 2/6 lần chạy** (160 ms, 57 ms).
 >
-> 1. **Khối "kết quả thật" và file bằng chứng là hai lần chạy khác nhau** — 6/6
->    dòng số lệch, và dòng `exit=0` trong file bằng chứng do shell nối thêm chứ
->    script không in. Đây là lỗi liêm chính của bằng chứng.
-> 2. **96,4% con số đó là thời gian chờ pool, không phải thời gian truy vấn.**
->    Đổi 200 người×10 lượt thành 20 người×100 lượt (cùng 2000 lượt) thì p95 tụt
->    từ 24,98 xuống 2,539 ms. Phép đo đang đo cái harness.
-> 3. **Không tái lập:** chạy lại y nguyên 14 lần thì 1 lần cho p95 = 80,862 ms,
->    tức phán quyết lật sang "ADR-0002 PHẢI MỞ LẠI".
+> Đọc theo cách gồm chi phí lấy kết nối → **2/6 lần chạy TRƯỢT**.
+> Đọc theo cách loại nó ra → phán quyết dưới đây đứng.
 >
-> Chi tiết + việc phải làm: [`dev/review.md`](dev/review.md).
-> Phần dưới giữ nguyên **làm hiện vật của vòng 1**, không phải kết luận.
+> Chọn cách đọc nào là quyết định kiến trúc, không phải việc của phép đo.
+> Đã chuyển sang `docs/pm/decisions.md §2` chờ chủ dự án.
+> Toàn bộ: [`dev/review.md`](dev/review.md).
 
----
+> **File này do máy sinh** từ `evd/WMS-1/do-p95.json` bằng
+> `scripts/sinh-bao-cao-wms1.py`. Không con số nào được chép tay — vòng review 1
+> bắt đúng lỗi đó. Sửa báo cáo = chạy lại phép đo.
+> Lần viết **2** · đo lúc `2026-08-19T10:09:37.673Z`
 
-~~**Kết luận: ADR-0002 ĐỦ ĐIỀU KIỆN CHỐT.**~~ ← RÚT LẠI, xem khối trên. p95 căn cứ **22,363 ms** = **4,47%**
-ngân sách 500 ms của NFR-PER-02, dưới ngưỡng 10% mà chính ADR tự đặt.
+## Phán quyết
 
-## Lệnh và kết quả thật
+**ADR-0002 ĐẠT điều kiện của chính nó.**
+p95 của lượt truy vấn, lấy lần xấu nhất trong 5 lần lặp × 2 hồ sơ
+dữ liệu: **2.271 ms**, so với ngưỡng 50 ms
+(10% của ngân sách 500 ms, NFR-PER-02).
+Tức lượt đọc phiên chiếm **0.45%** ngân sách.
 
-```
-$ node --env-file-if-exists=.env scripts/do-p95-phien.mjs
-bảng phiên      : 50200 dòng (200 sống + 50000 hết hạn)
-số lượt đo      : 1000 (sau 200 lượt làm nóng)
-p50             :    0.170 ms
-p95             :    0.209 ms   <-- con số ADR-0002 cần
-p99             :    0.263 ms
-min / max       :    0.127 /    5.353 ms
---- dưới tải: 200 người đồng thời, pool 20 kết nối ---
-số lượt đo      : 2000
-p50 / p95 / p99 :    8.215 /   22.363 /   25.461 ms
-ngưỡng ADR-0002 :   50.000 ms (10% của ngân sách 500 ms, NFR-PER-02)
-KẾT LUẬN: p95 căn cứ (xấu hơn trong hai pha) = 22.363 ms, chiếm 4.47% ngân sách
-          -> ADR-0002 ĐỦ ĐIỀU KIỆN CHỐT
-```
+Đây là phán quyết **duy nhất** phép đo này có tư cách đưa ra.
 
-Output đầy đủ: `evd/WMS-1/do-p95-output.txt`. Truy vấn đo đúng là truy vấn ADR-0002
-điều khoản 2 mô tả: đọc phiên theo khoá chính, JOIN cờ hoạt động của tài khoản,
-lọc `het_han_luc > now()`.
+## Số đo
 
-## Phát hiện quan trọng nhất: con số lúc rảnh rỗi là con số đánh lừa
+Môi trường: PostgreSQL 17.10 on aarch64-unknown-linux-musl · `shared_buffers` 128MB · localhost/stockflow_wms ·
+pool 20 kết nối · 200 người đồng thời · 5 lần lặp mỗi hồ sơ.
 
-Ticket chỉ yêu cầu 1.000 lượt đọc. Nếu dừng ở đó, báo cáo này sẽ nói **0,04%
-ngân sách** — nghe như không cần nghĩ thêm. Thêm pha đo có tranh chấp (200 người
-đồng thời, pool 20 kết nối theo SRS §2.3 chạy container) thì p95 nhảy **110 lần**,
-từ 0,209 ms lên 22,363 ms. Vẫn đạt, nhưng biên an toàn thật là **~2,2 lần** chứ
-không phải ~240 lần. Kết luận lấy con số XẤU HƠN của hai pha làm căn cứ.
+### Hồ sơ `sach` — 200 dòng, 0.1 MB
 
-## Điều kiện đo (đọc trước khi trích con số này đi đâu)
+| Lần | Nền p95 (ms) | Truy vấn khi tải p95 (ms) | Chờ pool p95 (ms) |
+|---|---|---|---|
+| 1 | 0.261 | 1.926 | 11.823 |
+| 2 | 0.314 | 2.200 | 13.889 |
+| 3 | 0.246 | 1.651 | 12.309 |
+| 4 | 0.232 | 1.766 | 10.730 |
+| 5 | 0.212 | 2.271 | 12.417 |
 
-| Yếu tố | Giá trị thật khi đo |
-|---|---|
-| CSDL | PostgreSQL 17 trong Docker, cùng máy với tiến trình đo (localhost) |
-| Dữ liệu | 50.200 dòng phiên: 200 còn sống + 50.000 đã hết hạn (mô phỏng rác chưa dọn) |
-| Người dùng | 500 bản ghi, 5% bị đánh dấu ngừng hoạt động |
-| Driver | `pg` thô, **không qua Prisma** |
-| Hạt ngẫu nhiên | cố định 20260819 — hai lần chạy chọn cùng dãy phiên |
-| Dọn dẹp | toàn bộ nằm trong schema `do_thu`, xoá trong khối `finally` kể cả khi lỗi |
+### Hồ sơ `rac_2_trieu` — 2,000,200 dòng, 506.3 MB
+
+| Lần | Nền p95 (ms) | Truy vấn khi tải p95 (ms) | Chờ pool p95 (ms) |
+|---|---|---|---|
+| 1 | 0.314 | 2.121 | 13.902 |
+| 2 | 0.269 | 1.893 | 11.219 |
+| 3 | 0.255 | 1.791 | 10.936 |
+| 4 | 0.252 | 1.602 | 10.359 |
+| 5 | 0.273 | 1.410 | 10.277 |
+
+## Ba điều số liệu nói mà lần viết trước nói ngược
+
+**1. Rác trong bảng phiên gần như không ảnh hưởng.** Bảng phình từ
+0.1 MB lên 506.3 MB
+(2,000,200 dòng, vượt xa `shared_buffers` 128MB) mà p95 truy vấn
+xấu nhất còn *nhích xuống*: 2.271 → 2.121 ms.
+Lần viết trước bày 50.000 dòng rác ra như một sức ép; số liệu nói nó không phải.
+Việc dọn phiên hết hạn vì thế là chuyện dung lượng đĩa, **không phải** chuyện tốc độ.
+
+**2. Thành phần lớn nhất không phải CSDL mà là hàng đợi pool.**
+Chờ pool p95 xấu nhất **13.902 ms**, gấp
+6.1 lần chi phí truy vấn. Nó **không**
+nằm trong phán quyết trên vì nó là hệ quả của kích thước pool (20 — một giả
+định chưa chốt, xem ADR-0002 C-3), không phải chi phí CSDL. Nhưng nó là phần mà
+người dùng thật sẽ cảm thấy, nên WMS-2 phải chốt con số pool một cách tường minh.
+
+**3. Suy giảm của thành phần khi 200 người đồng thời:
+624.5%** (nền 0.314 ms →
+2.271 ms) — vượt mốc cảnh báo 20%.
+**Đây là số liệu, không phải phán quyết NFR-PER-05.** NFR-PER-05 là tiêu chí ở mức màn hình (thời gian phản hồi đầu cuối). Phép đo này đo một thành phần nên KHÔNG kết luận đạt/trượt NFR-PER-05. Con số suy giảm ở đây là cảnh báo mang sang WMS-2.
 
 ## Giới hạn — những gì con số này KHÔNG chứng minh
 
-1. **Không có độ trễ mạng.** CSDL cùng máy. Thực tế ứng dụng và CSDL cách nhau ít
-   nhất một chặng mạng; cộng thêm 0,5–2 ms mỗi lượt là chuyện bình thường, và ở
-   pha có tải thì nó cộng dồn.
+1. **Không có độ trễ mạng.** CSDL cùng máy với tiến trình đo.
 2. **Không đo qua Prisma.** ADR-0001 chọn Prisma 7 + `@prisma/adapter-pg`; chi phí
-   của lớp ORM chưa nằm trong con số này.
-3. **Chỉ đo lượt ĐỌC.** ADR-0002 còn ghi `thao_tac_cuoi_luc` (gộp 60 giây) — tải
-   ghi chưa đo.
-4. **Máy lập trình, không phải máy chạy thật** — mà hạ tầng thật còn chờ OPN-03.
-5. Pool 20 kết nối là **giả định**, chưa phải cấu hình đã chốt; WMS-2 phải đặt
-   con số này tường minh.
+   lớp ORM chưa nằm trong con số này.
+3. **Chỉ đo lượt ĐỌC.** Việc ghi `thao_tac_cuoi_luc` (gộp 60 giây theo ADR-0002)
+   và nhánh xoá phiên hết hạn khi gặp lúc đọc đều chưa đo.
+4. **Máy lập trình, không phải máy chạy thật** — hạ tầng thật còn chờ OPN-03.
+5. **`shared_buffers` 128MB là mặc định**, chưa phải cấu hình đã chốt.
 
-Vì các giới hạn trên, kết luận đúng là *"ADR-0002 không bị bác bởi hiệu năng ở
-mức đã đo"*, chưa phải *"phương án này chắc chắn đủ nhanh khi chạy thật"*.
+Kết luận đúng phạm vi: *ADR-0002 không bị bác bởi chi phí truy vấn ở mức đã đo* —
+chưa phải *phương án này chắc chắn đủ nhanh khi chạy thật*.
 
-## Việc còn lại sinh ra từ đây
+## Việc sinh ra từ đây
 
-- ADR-0002 chuyển sang **Accepted** (chủ dự án xác nhận).
-- WMS-2 phải đặt kích thước pool tường minh và đo lại lượt đọc **qua Prisma**.
+- ADR-0002 đủ điều kiện chuyển **Accepted** (chủ dự án xác nhận).
+- WMS-2 phải: chốt kích thước pool tường minh, đo lại **qua Prisma**, và mang theo
+  cảnh báo suy giảm 624% ở mục 3.

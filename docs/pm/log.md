@@ -21,3 +21,5 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-19 | SA | Connor Pham | ADR-0002 phiên đăng nhập — bản Proposed | done · tok ≈ 22k | docs/adr/0002-phien-dang-nhap-va-thu-hoi-quyen.md |
 | 2026-08-19 | PM | Connor Pham | Gate B4 duyệt — tạo 6 ticket WMS-1..6, nạp sprint-1 | done · tok ≈ 18k | WMS-1 |
 | 2026-08-19 | DEV | Connor Pham | WMS-1 đo p95 lượt đọc phiên | failed: vòng review 2 người (R1+R2 REQUEST-CHANGES, 11 finding chặn) | evd/WMS-1/dev/review.md |
+| 2026-08-19 | PM | Connor Pham | T0+T1 phiên 4 — WMS-1 lần 2/2, T1 SKIP có lý do | done · tok ≈ 5k | docs/pm/sessions/2026-08-19-1747.md |
+| 2026-08-19 | DEV | Connor Pham | WMS-1 viết lại lần 2 — R2 APPROVE, R1 REQUEST-CHANGES | failed: vòng review 2 người (MỚI-1: cách đọc điều kiện ADR-0002) | evd/WMS-1/dev/review.md |
