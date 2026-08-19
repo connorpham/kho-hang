@@ -23,10 +23,16 @@ evd/**
 docs/*.docx
 docs/*.pdf
 docs/*.html
-# Q3 chốt 2026-08-19: giữ repo public, bản markdown nguồn của SRS/SRD CHỈ
-# nằm ở máy. Không có dòng này thì docs/specs/sources/*.md sẽ được commit
-# và toàn văn yêu cầu mật lên repo public — đúng thứ Q3 muốn tránh.
-docs/specs/sources/
+# Q3 + Q4 chốt 2026-08-19: giữ repo public, nên TOÀN BỘ tầng spec — cả bản
+# nguồn lẫn shard — chỉ nằm ở máy. Shard là trích nguyên văn SRS nên commit
+# shard cũng là công bố tài liệu mật, y hệt commit bản nguồn.
+# HỆ QUẢ ĐÃ ĐO, đừng ngạc nhiên khi gặp (docs/pm/decisions.md Q4):
+#   - file bị ignore KHÔNG có trong `git worktree` → lane nền của /team và CI
+#     đều mù spec. Việc gì cần đọc spec phải chạy trên cây làm việc chính.
+#   - dor_check.py:46 chỉ so chuỗi, không kiểm file tồn tại → ticket trích
+#     "docs/specs/…" vẫn xanh dù người khác không có file đó.
+# Dựng lại tầng spec trên máy mới: xem README §Tầng spec cục bộ.
+docs/specs/
 
 # ── Next.js / Node ─────────────────────────────────────────────────────────
 /node_modules

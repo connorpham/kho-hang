@@ -13,3 +13,5 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-19 | PM | Connor Pham | T0 roll call lần 2 sau khi chủ dự án gỡ A1+A2 | done · tok ≈ 6k | docs/pm/sessions/2026-08-19-1539.md |
 | 2026-08-19 | PM | Connor Pham | T1 P-DECIDE — Q1 tạm, Q2 chốt, Q3 chốt, Q4 mở | done · tok ≈ 12k | docs/pm/decisions.md |
 | 2026-08-19 | BA | Connor Pham | Nguồn hoá SRS/SRD sang markdown (dừng trước shard: Q4) | done · tok ≈ 32k | evd/BA-nguon-hoa-spec/REPORT.md |
+| 2026-08-19 | PM | Connor Pham | Q4 — chốt (b), thi hành + bù thiệt hại | done · tok ≈ 14k | docs/pm/decisions.md |
+| 2026-08-19 | BA | Connor Pham | Shard spec: 39 file + INDEX + gate --check | done · tok ≈ 26k | scripts/shard_spec.py |

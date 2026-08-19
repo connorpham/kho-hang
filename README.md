@@ -46,6 +46,26 @@ Kiểm tra kết nối:
 bash .vteam/db-check.sh
 ```
 
+### Tầng spec cục bộ (bắt buộc trước khi làm ticket)
+
+Quyết định Q3+Q4 (`docs/pm/decisions.md`) giữ repo public, nên **toàn bộ**
+`docs/specs/` — cả bản nguồn lẫn shard — bị gitignore và **không có trong bản
+clone**. Máy mới phải tự dựng lại, nếu không thì mọi ticket trích `docs/specs/…`
+đều trỏ vào chỗ trống:
+
+```bash
+# 1. chép SRS/SRD (.docx) vào docs/ — hỏi chủ dự án, chúng không nằm trong repo
+# 2. sinh bản nguồn markdown
+python3 scripts/docx_to_md.py docs/SRS_StockFlow_WMS_v1.0.docx docs/specs/sources/SRS.md
+python3 scripts/docx_to_md.py docs/SRD_StockFlow_WMS_v1.0.docx docs/specs/sources/SRD.md
+# 3. cắt thành shard theo màn hình + sinh INDEX
+python3 scripts/shard_spec.py
+```
+
+Cả hai script đều tất định (cùng .docx → cùng byte), nên hai máy dựng ra cùng
+một tầng spec. **Đó là thứ duy nhất giữ shard trung thực**: gate `verbatim`
+không dùng được dưới Q3 (xem [Bảo mật](#bảo-mật)).
+
 ### Chạy
 
 ```bash
@@ -111,20 +131,29 @@ Ticket đi qua **Jira** (`project.key = WMS`), nên Jira project phải có key 
 
 ## Bảo mật
 
-- SRS/SRD phân loại **"Nội bộ / Confidential"** nhưng repo GitHub đang **public**,
-  nên `docs/*.docx`, `docs/*.pdf`, `docs/*.html` bị gitignore và chỉ tồn tại trên
-  máy bạn. **Hệ quả:** ngay khi BA trỏ `specs.sources` vào các file đó, gate
-  `verbatim` sẽ xanh ở local nhưng **đỏ trên CI** vì file không có ở đó. Hiện
-  `sources` còn rỗng nên gate pass kèm cảnh báo. Chuyển repo sang private thì bỏ
-  được khối ignore đó và hết vấn đề.
+- SRS/SRD phân loại **"Nội bộ / Confidential"** nhưng repo GitHub đang **public**.
+  Quyết định Q3+Q4 (2026-08-19): giữ public, **toàn bộ tầng spec chỉ ở máy** —
+  `docs/*.docx|pdf|html` và cả `docs/specs/` đều gitignore. Ba hệ quả đã ĐO,
+  không phải suy đoán:
+  - `specs.sources` **phải giữ rỗng vĩnh viễn**. `verbatim_gate.py:37-38` gọi
+    `sys.exit` khi source thiếu, mà `verbatim` là step của `gate.sh` chạy trên
+    mọi push/PR ⇒ khai báo sources = **CI đỏ vĩnh viễn**. Gate này do đó không
+    canh gì; tính trung thực của shard chỉ được chống lưng bởi hai script tất
+    định ở [Tầng spec cục bộ](#tầng-spec-cục-bộ-bắt-buộc-trước-khi-làm-ticket).
+  - File bị ignore **không có trong `git worktree`** (đã thử). Việc nào cần đọc
+    spec phải chạy trên cây làm việc chính, không giao cho lane nền của `/team`.
+  - `dor_check.py:46` chỉ so chuỗi, **không kiểm file tồn tại** → ticket trích
+    `docs/specs/…` vẫn qua gate DoR dù người review không có file đó.
+  - Chuyển repo sang private thì cả ba hệ quả trên biến mất.
 - Token (Jira, DB) chỉ nằm trong `.env` — không bao giờ commit. `.env.example` là
   bản mẫu rỗng.
 
 ## Việc chưa làm
 
-- [ ] **`specs.sources` còn trống** → gate `verbatim` đang không canh gì. Cần BA
-      chuyển SRS/SRD sang markdown tại `docs/specs/sources/` rồi khai báo trong
-      `vteam.config.yaml`.
+- [x] ~~BA chuyển SRS/SRD sang markdown~~ — xong 2026-08-19
+      (`scripts/docx_to_md.py`, bằng chứng `evd/BA-nguon-hoa-spec/REPORT.md`).
+      `specs.sources` **cố ý để trống vĩnh viễn** theo Q3 — xem [Bảo mật](#bảo-mật).
+      Đổi lại: gate `verbatim` không canh gì, đây là nợ đã biết và đã ghi sổ.
 - [ ] **34/36 thực thể chưa mô hình hoá.** `prisma/schema.prisma` chỉ có 2 thực
       thể mà SRS §5.2 đặc tả tới từng cột; phần còn lại chờ SA.
 - [ ] **Chưa có migration nào.** Migration đầu tiên phải viết SQL thủ công cho
@@ -134,4 +163,6 @@ Ticket đi qua **Jira** (`project.key = WMS`), nên Jira project phải có key 
 - [ ] **Chưa có Dockerfile** cho app (`output: 'standalone'`) — thuộc DevOps.
 - [ ] **Chưa có `test:integration` / `test:e2e`** — hai bước `tail` của gate sẽ
       lỗi nếu gọi `npm run gate e2e`.
-- [ ] **JIRA_BASE_URL chưa có** → `npx vteam doctor` còn đỏ ở chân Tracker.
+- [x] ~~JIRA_BASE_URL~~ — xong 2026-08-19, preflight xanh cả 7 chân.
+- [ ] **Chưa có ticket nào trong Jira** (`project = WMS` trả về 0). Backlog là
+      việc kế tiếp của BA: shard → user story → gate B4.
