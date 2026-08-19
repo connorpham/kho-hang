@@ -1,6 +1,6 @@
 # ADR-0002 — Phiên đăng nhập lưu phía máy chủ, thu hồi quyền tức thời
 
-- **Trạng thái:** **Proposed** — chấp nhận là quyền của chủ dự án (buổi rà soát)
+- **Trạng thái:** **MỞ LẠI 2026-08-19** (xem §Sửa đổi 1) — vẫn Proposed, chấp nhận là quyền của chủ dự án
 - **Ngày:** 19/08/2026
 - **Bối cảnh tài liệu:** SRS §2.3, §4.1 (FR-01-06, FR-01-07), §7.1 (NFR-PER-02,
   NFR-PER-05), §7.3 (NFR-SEC-01, NFR-SEC-04, NFR-SEC-08); SRD BR-22; ADR-0001
@@ -131,3 +131,70 @@ một phép đo nào. Nếu một điều bị lật, khả năng cao nhất là
   tham số kiến trúc (thời hạn phiên, cận thu hồi) để có nghĩa. Đây là rò rỉ nhẹ
   hơn shard nhiều, nhưng vẫn là rò rỉ, và nó sẽ lặp lại ở mọi ADR sau. Chưa hỏi.
 - OPN-03 quyết xong thì mục "dọn phiên hết hạn" mới chốt được.
+
+
+---
+
+# Sửa đổi 1 — 2026-08-19: trần 50 ms GỒM chi phí lấy kết nối
+
+## Vì sao phải sửa
+
+WMS-1 đo xong thì lộ ra rằng bản gốc của ADR này viết điều kiện mập mờ: *"mỗi
+request cộng thêm một lượt đi CSDL … nếu nó ăn quá 10% ngân sách 500 ms"*. Không
+nói rõ "lượt đi" có gồm chi phí **lấy kết nối từ pool** hay không.
+
+Sự mập mờ đó không vô hại. Báo cáo WMS-1 vòng 2 tách chờ pool ra khỏi phán quyết
+và kết luận ĐẠT; reviewer R1 chỉ ra rằng **chính việc tách đó** giữ phán quyết ở
+ĐẠT, và đo được **riêng chờ pool p95 vượt trần 50 ms ở 2/6 lần chạy** (160 ms và
+57 ms). Chủ dự án đã quyết (A4, `docs/pm/decisions.md`):
+
+> **Trần 50 ms áp cho TOÀN BỘ chi phí mà một request phải trả thêm, tính từ lúc
+> xin kết nối tới lúc có dữ liệu phiên. Người dùng có chờ lấy kết nối, nên nó là
+> chi phí thật.**
+
+## Ba hệ quả
+
+**1. WMS-1 TRƯỢT theo cách đọc đúng và phải đo lại.** Phép đo phải ghi **cặp giá
+trị theo từng lượt** (chờ + truy vấn) rồi báo p95 của TỔNG — bản hiện tại chỉ lưu
+hai mảng rời nên p95 của tổng không khôi phục được từ bằng chứng.
+
+**2. Kích thước pool không còn là tham số vận hành.** Nó quyết định trực tiếp
+việc một yêu cầu ưu tiên M có đạt hay không, nên nó là **quyết định kiến trúc**
+và phải chốt TRƯỚC khi WMS-2 dựng lược đồ.
+
+**3. Quy tắc chọn pool — không phải một con số ma thuật.** SRS §2.3 chạy **nhiều
+bản sao sau load balancer**, nên ràng buộc thật là ràng buộc TỔNG:
+
+> `số bản sao × kích thước pool + dự phòng quản trị ≤ max_connections`
+
+Container hiện tại có `max_connections = 100`. R1 đã chứng minh mặt trái khi coi
+thường ràng buộc này: đặt pool = 100 thì `Promise.all` các `connect()` bị từ chối
+một phần, client đã lấy không bao giờ được release, `pool.end()` không bao giờ
+resolve — **tiến trình treo vô hạn và chiếm hết kết nối, cả máy không ai vào được
+CSDL dev nữa**. Một cấu hình sai ở đây không làm hệ thống chậm, nó làm hệ thống
+chết.
+
+## Quyết định tạm về kích thước pool
+
+🟡 **PROVISIONAL 2026-08-19 — pending acceptance.** Máy đặt tạm **pool = 20 cho
+mỗi bản sao, tối đa 3 bản sao** (60 kết nối + 40 dự phòng trên `max_connections`
+100). Cơ sở: đây là cấu hình mà WMS-1 đã đo thật, không phải con số nghĩ ra.
+
+**Điều kiện xác nhận:** WMS-1 (đo lại) phải cho **p95 của TỔNG chờ + truy vấn ≤
+50 ms** ở cấu hình này, đo qua nhiều lần lặp và lấy lần xấu nhất. Không đạt thì
+hoặc tăng `max_connections` (phụ thuộc **OPN-03**, vì hạ tầng quyết định con số
+đó), hoặc giảm số bản sao, hoặc quay lại PA-4 (Redis) — và khi đó Redis không còn
+là "thêm hạ tầng cho vui" mà là cách duy nhất đạt yêu cầu.
+
+**Vì sao đây chỉ là tạm:** `max_connections = 100` là **mặc định của image
+`postgres:17-alpine`**, chưa phải cấu hình đã chốt của môi trường chạy thật — mà
+môi trường chạy thật còn chờ OPN-03. Con số bản sao cũng chưa ai quyết. Hai ẩn số
+đó đóng lại thì quy tắc ở trên mới ra được một con số cuối cùng.
+
+## Cập nhật mục Hệ quả tiêu cực của bản gốc
+
+Gạch đầu dòng *"Mỗi request cộng thêm một lượt đi CSDL"* nay đọc là: **chi phí đó
+gồm cả thời gian chờ lấy kết nối**, và ở tải 200 người đồng thời thì **thời gian
+chờ pool là thành phần LỚN HƠN chi phí truy vấn vài lần** (WMS-1 đo: truy vấn p95
+~2 ms, chờ pool p95 10–18 ms ở lần chạy bình thường). Tối ưu truy vấn không giải
+quyết được gì; chỉnh pool mới giải quyết.
