@@ -65,8 +65,26 @@ Nội dung yêu cầu chỉ tham chiếu bằng MÃ (luật Q3/Q4).
 | A2 | **Dựng DB cục bộ.** Cổng 5432 đóng; Docker daemon tắt; CLI `/usr/local/bin/docker` là symlink gãy (trỏ `/Volumes/Docker/…` đã tháo). | Khởi động service hệ thống + tạo database trên máy chủ sở hữu | ✅ DECIDED 2026-08-19 — chủ dự án bật Docker; máy chạy `docker compose up -d db`, `db-check.sh` → `DB reachable` | 2026-08-20 |
 | A3 | **Sửa symlink docker CLI** (không chặn việc gì hôm nay, nhưng mọi script gọi `docker` trần sẽ trượt): `/usr/local/bin/docker` → `/Volumes/Docker/…` không còn tồn tại; binary thật ở `/Applications/Docker.app/Contents/Resources/bin/docker`. Phiên này phải gọi bằng đường dẫn tuyệt đối để lách. | Sửa symlink trong `/usr/local/bin` cần quyền root | 🔴 OPEN | 2026-08-26 |
 
+### 2.1 Gate B4 — batch #1 đã duyệt 2026-08-19
+
+Chủ dự án chọn "Duyệt — tạo ticket ngay". Đã tạo 6 ticket trong Jira project WMS
+và nạp `docs/pm/plan.yaml` sprint-1 (5.5/8.0 pd):
+
+| Ticket | Việc | pd | DoR hiện tại |
+|---|---|---|---|
+| WMS-1 | Đo p95 lượt đọc phiên (điều kiện chốt ADR-0002) | 0.5 | ✅ **sẵn sàng code** |
+| WMS-2 | Nền danh tính NguoiDung/VaiTro/Kho/Phien + migration | 1.5 | ❌ chờ WMS-1 |
+| WMS-3 | S-01 đăng nhập + khoá tạm | 1.5 | ❌ chờ WMS-2 · thiếu oracle thiết kế (G-04) · nội dung thông báo chờ G-01 |
+| WMS-4 | S-02 chọn kho làm việc | 1.0 | ❌ chờ WMS-2, WMS-3 · thiếu oracle (G-04) · chờ G-03 |
+| WMS-5 | S-03 hết phiên 30 phút | 0.5 | ❌ chờ WMS-2, WMS-3 · thiếu oracle (G-04) |
+| WMS-6 | S-07 nhật ký đăng nhập | 0.5 | ❌ chờ WMS-2 |
+
+Ba ticket UI đỏ ở gate DoR vì **thiếu link thiết kế** — đây là hành vi ĐÚNG, không
+phải lỗi: mô tả của chúng ghi thẳng chữ "UI" thay vì lách lỗ hổng KI-002 (regex
+tiếng Anh không bắt được mô tả tiếng Việt). Trả lời G-04 là ba cái này xanh.
+
 ## 3. ADRs pending
 
 | ADR | Decision | Status |
 |---|---|---|
-| ADR-0002 | **Cơ chế phiên đăng nhập phải thu hồi được quyền trong 2 phút.** Ràng buộc chéo do BA phát hiện: FR-01-07 cho phiên sống 30 phút không thao tác, còn NFR-SEC-08 bắt tài khoản bị vô hiệu hoá phải mất hiệu lực trên **mọi phiên đang chạy trong tối đa 2 phút**. Một token tự chứa (stateless) sống 30 phút KHÔNG thoả được cận 2 phút — phải có tra cứu phía máy chủ hoặc danh sách thu hồi. Đây là quyết định kiến trúc, không phải việc BA chọn hộ: nó định hình chỗ lưu phiên, tải lên CSDL mỗi request, và cách chạy nhiều tiến trình. Chặn T-00 (không viết migration khi chưa biết có bảng phiên hay không) và S-01. | 🟡 **PROPOSED 2026-08-19 — chờ chủ dự án chấp nhận.** Bản viết: `docs/adr/0002-phien-dang-nhap-va-thu-hoi-quyen.md`. Chọn PA-3 (bản ghi phiên trong PostgreSQL, kiểm mỗi request, join cờ hoạt động của tài khoản → thu hồi 0 phút thay vì cận 2 phút). Loại PA-1 (JWT 30 phút vi phạm thẳng NFR-SEC-08), PA-2 (refresh token: vẫn hỏi CSDL, thêm cơ chế, làm chậm đổi kho), PA-4 (Redis: thêm hạ tầng cho đội 1 người và ép trước OPN-03). **Vòng challenger độc lập CHƯA chạy** (chỉ thị đứng về AgentTool) — mục Challenge là tự phản biện. **Chặn T-00.** |
+| ADR-0002 | **Cơ chế phiên đăng nhập phải thu hồi được quyền trong 2 phút.** Ràng buộc chéo do BA phát hiện: FR-01-07 cho phiên sống 30 phút không thao tác, còn NFR-SEC-08 bắt tài khoản bị vô hiệu hoá phải mất hiệu lực trên **mọi phiên đang chạy trong tối đa 2 phút**. Một token tự chứa (stateless) sống 30 phút KHÔNG thoả được cận 2 phút — phải có tra cứu phía máy chủ hoặc danh sách thu hồi. Đây là quyết định kiến trúc, không phải việc BA chọn hộ: nó định hình chỗ lưu phiên, tải lên CSDL mỗi request, và cách chạy nhiều tiến trình. Chặn T-00 (không viết migration khi chưa biết có bảng phiên hay không) và S-01. | 🟡 **CHẤP NHẬN CÓ ĐIỀU KIỆN 2026-08-19 — chủ dự án chọn "chấp nhận nhưng phải đo trước".** Điều kiện: WMS-1 đo p95 lượt đọc phiên trên dữ liệu giả; dưới 10% ngân sách 500 ms của NFR-PER-02 thì ADR chuyển Accepted, trên thì mở lại. T-00 vì thế tách làm WMS-1 (đo) và WMS-2 (dựng lược đồ). Bản viết: `docs/adr/0002-phien-dang-nhap-va-thu-hoi-quyen.md`. Chọn PA-3 (bản ghi phiên trong PostgreSQL, kiểm mỗi request, join cờ hoạt động của tài khoản → thu hồi 0 phút thay vì cận 2 phút). Loại PA-1 (JWT 30 phút vi phạm thẳng NFR-SEC-08), PA-2 (refresh token: vẫn hỏi CSDL, thêm cơ chế, làm chậm đổi kho), PA-4 (Redis: thêm hạ tầng cho đội 1 người và ép trước OPN-03). **Vòng challenger độc lập CHƯA chạy** (chỉ thị đứng về AgentTool) — mục Challenge là tự phản biện. **Chặn T-00.** |

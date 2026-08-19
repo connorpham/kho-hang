@@ -19,3 +19,4 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-19 | BA | Connor Pham | Batch #1 SC-01: 1 task + 7 story, dừng ở gate B4 | done · tok ≈ 34k | docs/pm/decisions.md |
 | 2026-08-19 | PM | Connor Pham | T0+T1 phiên 3 — T1 SKIP có lý do, chọn ADR-0002 | done · tok ≈ 6k | docs/pm/sessions/2026-08-19-1635.md |
 | 2026-08-19 | SA | Connor Pham | ADR-0002 phiên đăng nhập — bản Proposed | done · tok ≈ 22k | docs/adr/0002-phien-dang-nhap-va-thu-hoi-quyen.md |
+| 2026-08-19 | PM | Connor Pham | Gate B4 duyệt — tạo 6 ticket WMS-1..6, nạp sprint-1 | done · tok ≈ 18k | WMS-1 |
