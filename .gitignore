@@ -33,6 +33,10 @@ docs/*.html
 #     "docs/specs/…" vẫn xanh dù người khác không có file đó.
 # Dựng lại tầng spec trên máy mới: xem README §Tầng spec cục bộ.
 docs/specs/
+# Cùng lý do: user story và tiêu chí chấp nhận là nội dung DẪN XUẤT từ spec mật
+# (AC trích thẳng câu FR). Commit backlog draft = công bố spec bằng đường vòng.
+# Nội dung ticket đi vào Jira (private) — đó mới là chỗ của nó.
+docs/backlog/
 
 # ── Next.js / Node ─────────────────────────────────────────────────────────
 /node_modules

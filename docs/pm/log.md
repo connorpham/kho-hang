@@ -15,3 +15,5 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-19 | BA | Connor Pham | Nguồn hoá SRS/SRD sang markdown (dừng trước shard: Q4) | done · tok ≈ 32k | evd/BA-nguon-hoa-spec/REPORT.md |
 | 2026-08-19 | PM | Connor Pham | Q4 — chốt (b), thi hành + bù thiệt hại | done · tok ≈ 14k | docs/pm/decisions.md |
 | 2026-08-19 | BA | Connor Pham | Shard spec: 39 file + INDEX + gate --check | done · tok ≈ 26k | scripts/shard_spec.py |
+| 2026-08-19 | PM | Connor Pham | T0+T1 phiên 2 — chọn SC-01 làm batch đầu | done · tok ≈ 8k | docs/pm/sessions/2026-08-19-1626.md |
+| 2026-08-19 | BA | Connor Pham | Batch #1 SC-01: 1 task + 7 story, dừng ở gate B4 | done · tok ≈ 34k | docs/pm/decisions.md |

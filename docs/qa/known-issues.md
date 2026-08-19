@@ -20,3 +20,18 @@ Workaround: gọi bằng đường dẫn tuyệt đối
 `/Applications/Docker.app/Contents/Resources/bin/docker compose up -d db`.
 Sửa dứt điểm cần quyền root → đã đăng ký A3 trong docs/pm/decisions.md §2.
 
+## KI-002 · `dor_check.py` dò bằng chuỗi tiếng Anh trong dự án viết tiếng Việt
+Symptom: ticket viết tiếng Việt đầy đủ vẫn trượt gate DoR ở mục "no out-of-scope
+section"; ngược lại, ticket UI viết tiếng Việt lại LỌT qua luật bắt buộc có link
+thiết kế — gate xanh mà không canh gì.
+Cause: `dor_check.py` dùng regex tiếng Anh cứng — `OOS = (out of scope|out-of-scope)`
+(dòng 23), `NO_UI = \bno UI\b` (24), và luật ticket-UI chỉ kích hoạt khi mô tả
+chứa `screen|page|UI` (dòng 50). Mô tả tiếng Việt ("Ngoài phạm vi", "màn hình")
+không khớp regex nào.
+Workaround: mô tả ticket phải chứa nguyên văn các chuỗi tiếng Anh `out of scope`,
+`no UI` (khi không có giao diện), giữ từ khoá `Given/When/Then`, và link thiết kế
+phải có tiền tố `mockup:` / `design node:` / URL figma. Đã ghi thành mục bắt buộc
+ở cuối `docs/backlog/sc-01-dang-nhap-draft.md`.
+Sửa dứt điểm: bổ sung từ khoá tiếng Việt vào regex của dor_check — thuộc harness
+vteam, không sửa trong repo này.
+
