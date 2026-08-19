@@ -1,0 +1,95 @@
+// StockFlow WMS — Prisma schema
+//
+// PHẠM VI FILE NÀY (đọc trước khi thêm model):
+//   Chỉ chứa 2 thực thể lõi mà SRS §5.2 ĐẶC TẢ ĐẦY ĐỦ tới từng cột:
+//   SoDuTonKho (§5.2.1) và ChuyenDongKho (§5.2.2).
+//   SRS §5.1 liệt kê 36 thực thể; 34 thực thể còn lại CHƯA có đặc tả cột nên
+//   KHÔNG được mô hình hoá ở đây — chúng thuộc phần việc của SA/BA (ADR + shard
+//   spec) để tránh tự phát minh cấu trúc dữ liệu.
+//
+//   Vì các thực thể được tham chiếu (SanPham, Kho, ViTri, Lo, SerialItem,
+//   NguoiDung) chưa tồn tại, các khoá ngoại dưới đây là cột BigInt trần, chưa
+//   có quan hệ Prisma. Khi SA mô hình hoá xong, thay bằng @relation.
+//
+// Ràng buộc hạ tầng (SRS §2.3 + OPN-03 CHƯA CHỐT):
+//   SRS chỉ yêu cầu "RDBMS hỗ trợ ACID, cô lập tối thiểu READ COMMITTED, khoá
+//   bản ghi tường minh". PostgreSQL là lựa chọn mặc định của base này và cần
+//   một ADR xác nhận khi OPN-03 được quyết định.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7: URL kết nối KHÔNG còn khai báo ở đây.
+//   - Migrate/introspect đọc từ prisma.config.ts
+//   - Runtime dùng driver adapter (@prisma/adapter-pg) — xem src/lib/prisma.ts
+datasource db {
+  provider = "postgresql"
+}
+
+/// SRS §5.2.1 — Số dư tồn kho.
+/// RSK-K03: số dư nằm ở bảng tổng hợp riêng, tách khỏi sổ chuyển động, và phải
+/// được cập nhật trong CÙNG giao dịch với ChuyenDongKho (DC-05).
+model SoDuTonKho {
+  id              BigInt   @id @default(autoincrement())
+  sanPhamId       BigInt   @map("san_pham_id")
+  khoId           BigInt   @map("kho_id")
+  viTriId         BigInt   @map("vi_tri_id")
+  /// Bắt buộc khi sản phẩm truy vết theo lô.
+  loId            BigInt?  @map("lo_id")
+
+  soLuongThucTe   Decimal  @map("so_luong_thuc_te")  @db.Decimal(18, 3)
+  soLuongPhanBo   Decimal  @map("so_luong_phan_bo")  @db.Decimal(18, 3) @default(0)
+  soLuongChoQc    Decimal  @map("so_luong_cho_qc")   @db.Decimal(18, 3)
+  soLuongCachLy   Decimal  @map("so_luong_cach_ly")  @db.Decimal(18, 3)
+  soLuongKhoa     Decimal  @map("so_luong_khoa")     @db.Decimal(18, 3)
+  /// Cột dẫn xuất theo công thức BRULE-11, duy trì đồng bộ.
+  soLuongKhaDung  Decimal  @map("so_luong_kha_dung") @db.Decimal(18, 3)
+
+  capNhatLuc      DateTime @map("cap_nhat_luc") @updatedAt
+  /// Kiểm soát tương tranh lạc quan.
+  phienBan        Int      @map("phien_ban") @default(0)
+
+  // BRULE-12 (mọi cột số lượng >= 0) là CHECK constraint — Prisma không sinh
+  // được, phải thêm bằng SQL thủ công trong migration đầu tiên.
+  @@unique([sanPhamId, khoId, viTriId, loId])
+  @@map("so_du_ton_kho")
+}
+
+/// SRS §5.2.2 — Sổ chuyển động kho. CHỈ GHI THÊM (append-only).
+/// BRULE-13 / RSK-P01: quyền UPDATE và DELETE phải bị THU HỒI ở cấp tài khoản
+/// DB của ứng dụng — Prisma không cưỡng chế được, phải làm bằng GRANT trong
+/// migration. Bảng phân vùng theo tháng (chưa cấu hình được: chờ OPN-03).
+model ChuyenDongKho {
+  id               BigInt   @id @default(autoincrement())
+  /// NHAP | XUAT | CHUYEN_DI | CHUYEN_DEN | DIEU_CHINH | KIEM_KE | TRA_VE | CAT_HANG
+  /// SRS đặc tả VARCHAR(30), không phải enum DB — giữ nguyên kiểu.
+  loaiGiaoDich     String   @map("loai_giao_dich") @db.VarChar(30)
+
+  sanPhamId        BigInt   @map("san_pham_id")
+  khoId            BigInt   @map("kho_id")
+  viTriId          BigInt   @map("vi_tri_id")
+  loId             BigInt?  @map("lo_id")
+  /// Bắt buộc khi sản phẩm truy vết theo serial.
+  serialItemId     BigInt?  @map("serial_item_id")
+
+  /// Dương là tăng, âm là giảm.
+  soLuong          Decimal  @map("so_luong")   @db.Decimal(18, 3)
+  tonTruoc         Decimal  @map("ton_truoc")  @db.Decimal(18, 3)
+  tonSau           Decimal  @map("ton_sau")    @db.Decimal(18, 3)
+
+  /// Tham chiếu đa hình tới chứng từ nguồn.
+  loaiChungTu      String   @map("loai_chung_tu") @db.VarChar(30)
+  chungTuId        BigInt   @map("chung_tu_id")
+  /// Bắt buộc với giao dịch loại DIEU_CHINH.
+  lyDoId           BigInt?  @map("ly_do_id")
+
+  nguoiThucHienId  BigInt   @map("nguoi_thuc_hien_id")
+  /// Thời điểm phát sinh — không thể sửa.
+  thoiDiem         DateTime @map("thoi_diem")
+
+  @@index([sanPhamId, khoId, thoiDiem])
+  @@index([loaiChungTu, chungTuId])
+  @@map("chuyen_dong_kho")
+}

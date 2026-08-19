@@ -1,0 +1,58 @@
+{
+  "name": "stockflow-wms",
+  "version": "0.1.0",
+  "description": "StockFlow WMS — Warehouse Management System",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "gate": "python3 .vteam/scripts/gate.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/connorpham/kho-hang.git"
+  },
+  "author": "Techvify — BA & Solution Design",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/connorpham/kho-hang/issues"
+  },
+  "homepage": "https://github.com/connorpham/kho-hang#readme",
+  "private": true,
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "next": "16.3.1",
+    "pg": "^8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.1",
+    "prisma": "^7.9.1",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3",
+    "vteam-harness": "^0.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.1"
+  }
+}

@@ -1,0 +1,2 @@
+# vteam: the dispatch ledger is append-only — union merge keeps two humans' appends conflict-free
+docs/pm/log.md merge=union

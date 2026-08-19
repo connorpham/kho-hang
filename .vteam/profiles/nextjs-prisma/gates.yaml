@@ -1,0 +1,44 @@
+# nextjs-prisma profile — the source harness's native stack, ported step for step.
+# Ordering constraints are real: `typegen` must precede `types`; `token-check`
+# must FOLLOW `build` (it reads the built CSS chunks).
+# TRUST BOUNDARY: every `run` below executes as a shell command from the repo
+# root (like package.json scripts). Repo write access = execute access here —
+# review changes to this file as code, high-stakes in PRs.
+steps:
+  docs-shrink:
+    run: "bash .vteam/scripts/docs_shrink_check.sh"
+  ledger:
+    run: "python3 .vteam/scripts/log_check.py"
+  verbatim:
+    run: "python3 .vteam/scripts/verbatim_gate.py"
+  lockfile:
+    run: "bash .vteam/scripts/lockfile_check.sh"
+  prisma-generate:
+    run: "npx prisma generate"
+    requires: "prisma/schema.prisma"
+    skip_reason: "no prisma/schema.prisma — wrong profile? use `node`"
+  lint:
+    run: "{package_manager} run lint"
+  typegen:
+    run: "npx next typegen"
+  types:
+    run: "npx tsc --noEmit"
+  unit:
+    run: "{package_manager} test"
+    # Probe (run silently): package.json must declare scripts.test AND it must
+    # not be an obvious no-op (echo / true / exit 0). This is a TRIPWIRE, not
+    # proof — a cleverer fake still passes it; only a real suite is verification.
+    requires_cmd: node -e 'const s=(require("./package.json").scripts||{}).test;if(!s||/^\s*(echo|true|exit 0)\b/.test(s))process.exit(1)'
+    skip_reason: "no real test script — the repo ships with ZERO verification until one exists (loud)"
+  build:
+    run: "{package_manager} run build"
+  token-check:
+    run: "node .vteam/profiles/nextjs-prisma/scripts/token_check.mjs"
+    requires: ".vteam/profiles/nextjs-prisma/scripts/token_check.mjs"
+    skip_reason: "token_check plugin not installed (Tailwind v4 CSS reality check)"
+  integration:
+    run: "{package_manager} run test:integration"
+    tail: true
+  e2e:
+    run: "npm run test:e2e"
+    tail: true

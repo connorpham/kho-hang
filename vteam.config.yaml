@@ -1,0 +1,120 @@
+# vteam configuration — the contract between this repo and the framework.
+# Schema house of record: the vteam package's docs/DESIGN.md §2.
+version: 1
+
+project:
+  name: 'StockFlow WMS'
+  key: WMS
+  language: vi
+  adopted: 2026-08-19
+
+paths:
+  specs: docs/specs
+  pm: docs/pm
+  qa: docs/qa
+  adr: docs/adr
+  team: docs/team
+  design: docs/design
+  evidence: evd
+  backlog: docs/backlog
+
+specs:
+  # the ORIGINAL spec documents BA shards from (verbatim_gate compares shards
+  # in paths.specs against these — leave empty until you have source docs;
+  # never point it at paths.specs itself: self-comparison is self-grading)
+  # CÒN TRỐNG — gate `verbatim` đang KHÔNG canh gì cả (nó cảnh báo to rồi pass).
+  # Lý do: verbatim_gate đọc source bằng read_text(utf-8) và so khớp regex
+  #   ^\| \*\*<MÃ>\*\* \|
+  # nên source phải là markdown/plain text có bảng yêu cầu — .docx và .pdf trong
+  # docs/ KHÔNG dùng trực tiếp được.
+  # VIỆC ĐẦU TIÊN CỦA BA: chuyển SRS/SRD sang markdown tại docs/specs/sources/
+  # (giữ nguyên verbatim từng dòng yêu cầu), rồi liệt kê ở đây:
+  #   sources: [docs/specs/sources/SRS.md, docs/specs/sources/SRD.md]
+  sources: []
+
+docs:
+  task_context:            # extra background /dev reads at T1, keyed by ticket label/type
+    always:                # đọc cho MỌI ticket
+      - docs/adr/0001-stack-nextjs-prisma-postgres.md
+    by_label: {}           # label/type (lowercase) -> file list; a mapped-but-missing
+                           # file is reported LOUDLY in the task sheet, never guessed
+
+stack:
+  profile: nextjs-prisma
+  package_manager: npm
+
+git:
+  protected_branch: main
+  branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
+  merge_strategy: merge
+  # merge | squash | rebase — how PRs land on the protected branch. squash and
+  # rebase DISCARD branch shas, so QA verdicts anchor by VERIFIED-AT (qa workflow)
+  # and stale_verdict_check falls back to it; set this to match your repo.
+  hooks: managed
+  # Derived from THIS repo's layout at init time (field-trial finding #17: a
+  # hardcoded [src/, prisma/] default silently lost the review fence on repos
+  # whose code lives in lib/, app/ or root files). Review it — the review fence
+  # and stale-verdict gate only watch what is listed here. An empty list means
+  # derivation found nothing: doctor warns, and the pre-push fence FAILS CLOSED
+  # (every path is treated as product code) until you fill it in.
+  code_paths: [src/, prisma/]
+
+tracker:
+  provider: jira
+  done_statuses: [Done, Closed, Resolved]
+  review_status: In Review
+
+design:
+  provider: none
+
+team:
+  size: 1
+  capacity_per_day: 0.8
+
+autonomy:
+  level: assisted
+  # agent may merge its own green PR — only honored at level: full; flip to
+  # false to keep every merge in human hands even at full autonomy
+  self_merge: false
+  exemptions:
+    - real-money
+    - legal
+    - purchasing
+    - credentials
+    - data-deletion
+
+review:
+  reviewers: 2
+  # Đường dẫn mà một lỗi review là không thể sửa êm: schema/migration chạm dữ
+  # liệu tồn kho thật, ton-kho.ts là house of record của BRULE-11 (SRD §7 yêu
+  # cầu "áp dụng nhất quán ở mọi màn hình và mọi API"), gates.yaml thực thi
+  # shell command từ repo root nên write access = execute access.
+  high_stakes_paths:
+    - prisma/schema.prisma
+    - prisma/migrations/
+    - src/lib/ton-kho.ts
+    - .vteam/profiles/
+    - vteam.config.yaml
+    - .github/workflows/
+  # Từ vựng nghiệp vụ mang nghĩa mất tiền hoặc không thể hoàn tác.
+  high_stakes_terms:
+    - dieu chinh
+    - điều chỉnh
+    - kiem ke
+    - kiểm kê
+    - huy phieu
+    - hủy phiếu
+    - dao nguoc
+    - đảo ngược
+    - phan bo
+    - phân bổ
+    - chuyen dong kho
+    - chuyển động kho
+    - ton kha dung
+    - tồn khả dụng
+    - GRANT
+    - REVOKE
+    - migrate deploy
+
+models:
+  routing: default

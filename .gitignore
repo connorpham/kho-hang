@@ -1,0 +1,53 @@
+# ── vteam ──────────────────────────────────────────────────────────────────
+# evidence: bản text commit, binary thì không
+evd/**
+!evd/**/
+!evd/**/*.md
+!evd/**/*.json
+# snapshot doctor cục bộ cho `vteam board`
+.vteam/doctor.json
+# bytecode python do gate sinh lại — không commit, không manifest
+.vteam/**/__pycache__/
+
+# ── Bí mật ─────────────────────────────────────────────────────────────────
+# token sống trong .env — .env KHÔNG bao giờ commit
+.env
+.env.*
+!.env.example
+
+# ── Tài liệu nội bộ ────────────────────────────────────────────────────────
+# SRS/SRD phân loại "Nội bộ / Confidential" mà repo đang PUBLIC → giữ ở máy.
+# HỆ QUẢ: gate `verbatim` chỉ chạy được trên máy có sẵn các file này; trên CI
+# nó sẽ đỏ vì thiếu specs.sources. Đổi repo sang private để bỏ khối này.
+docs/*.docx
+docs/*.pdf
+docs/*.html
+
+# ── Next.js / Node ─────────────────────────────────────────────────────────
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+/.next/
+/out/
+/build
+/coverage
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Prisma ─────────────────────────────────────────────────────────────────
+# client sinh tự động bởi `prisma generate` (gate chạy trước typecheck/build)
+/src/generated/
+
+# ── Khác ───────────────────────────────────────────────────────────────────
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

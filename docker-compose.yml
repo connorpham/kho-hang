@@ -1,0 +1,28 @@
+# Postgres cho môi trường phát triển cục bộ.
+# SRS §2.3 yêu cầu triển khai dạng container và RDBMS hỗ trợ ACID + cô lập tối
+# thiểu READ COMMITTED + khoá bản ghi tường minh (SELECT ... FOR UPDATE).
+# Hạ tầng chạy thật (cloud hay data center nội bộ) còn chờ quyết định OPN-03.
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: stockflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stockflow_wms
+      # Ép UTF-8 và collation ổn định: dữ liệu là tiếng Việt có dấu.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    ports:
+      - '5432:5432'
+    volumes:
+      - stockflow-pgdata:/var/lib/postgresql/data
+      - ./prisma/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d stockflow_wms']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  stockflow-pgdata:
