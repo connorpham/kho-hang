@@ -36,14 +36,37 @@ so_du_ton_kho_to_hop_khoa NULLS NOT DISTINCT: true
 nhat_ky_thao_tac.nguoi_dung_id: NULLABLE
 ```
 
-## Bằng chứng — 27 test tích hợp
+## Bằng chứng — 38 test tích hợp (lần 2)
 
 ```
 $ npm run test:integration
      [itest] PostgreSQL 17.10 · stockflow_wms
-         Tests  27 passed (27)
-      Duration  255ms (transform 22ms, setup 0ms, collect 27ms, tests 66ms, environment 0ms, prepare 35ms)
+         Tests  38 passed (38)
+      Duration  199ms (transform 17ms, setup 0ms, collect 28ms, tests 78ms, environment 0ms, prepare 23ms)
 ```
+
+## Lần thử 2 — năm việc R3 đòi, và một lỗi tôi tự tìm ra
+
+| R3 đòi | Đã làm |
+|---|---|
+| Ràng buộc CSDL cho định dạng băm | `CHECK` cho phép **đúng ba** họ thuật toán NFR-SEC-03 nêu tên (bcrypt · scrypt · Argon2). R3 gợi ý chỉ `^\$argon2` — chặn hẹp hơn spec là tự thu hẹp spec |
+| Test `session_replication_role='replica'` | có, cho cả hai bảng chỉ-ghi-thêm |
+| Khẳng định trọn 10 cặp (mã, tên) + tập `man_hinh` | có, khẳng định TẬP thay vì đếm lực lượng |
+| Cam kết hồ sơ review | `evd/WMS-2/dev/review.md` đã commit |
+| Ba test rẻ: kiểu cột · khoá ngoại · unique | có |
+
+**Rồi tôi tự chạy lại bảy phép đột biến của R3 trước khi gửi review — và bắt được
+một lỗi không ai nêu:** hai test khoá ngoại mới viết **xanh vì lý do sai**. Chúng
+khẳng định `23503` nhưng không phân biệt khoá ngoại nào phát ra nó, nên gỡ
+`chuyen_dong_kho_kho_id_fkey` thì khoá ngoại `nguoi_thuc_hien_id` che mất và test
+vẫn xanh. Sửa theo lớp: **khẳng định TÊN ràng buộc** ở 12 chỗ, không chỉ mã lỗi.
+Một lỗi thứ hai lộ ra cùng lúc: câu DELETE dùng CTE ghi dữ liệu **không thấy dòng
+CTE vừa chèn** (cùng ảnh chụp), nên nó xoá 0 dòng và test xanh vô nghĩa.
+
+Đột biến sau khi sửa: gỡ FK `kho_id` → 1 đỏ · gỡ FK `nguoi_thuc_hien_id` → 2 đỏ ·
+gỡ CHECK tồn-không-âm → 6 đỏ · gỡ CHECK băm → 1 đỏ · hạ `ENABLE ALWAYS` → 3 đỏ ·
+đảo một cột về `timestamp` → 1 đỏ · gỡ unique tên đăng nhập → 1 đỏ · đổi tên 8 vai
+trò → 1 đỏ · `SC-xx` → `RAC-xx` → 1 đỏ. **Không phép nào còn lọt.**
 
 ## Vòng review 3 người tìm ra 12 finding chặn — tóm tắt cái nặng nhất
 

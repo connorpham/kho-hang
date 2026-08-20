@@ -66,7 +66,10 @@ model SoDuTonKho {
 
   // BRULE-12 (mọi cột số lượng >= 0) là CHECK constraint — Prisma không sinh
   // được, phải thêm bằng SQL thủ công trong migration đầu tiên.
-  @@unique([sanPhamId, khoId, viTriId, loId])
+  /// map: để tên index khớp migration. Prisma không diễn đạt được NULLS NOT
+  /// DISTINCT nên index thật được tạo bằng SQL tay; không có map thì
+  /// `migrate dev` lần sau sinh một migration đổi tên vô nghĩa.
+  @@unique([sanPhamId, khoId, viTriId, loId], map: "so_du_ton_kho_to_hop_khoa")
   @@map("so_du_ton_kho")
 }
 
@@ -152,12 +155,14 @@ model Kho {
   @@map("kho")
 }
 
-/// SRS §5.1 — Vai trò và ma trận quyền. §8 định nghĩa 9 vai trò mặc định;
+/// SRS §5.1 — Vai trò và ma trận quyền. §8 định nghĩa 9 vai trò trong bảng, và
+/// ghi chú thêm vai trò thứ 10 (Kiểm toán nội bộ, chỉ đọc toàn bộ màn hình) mà
+/// §2.2 vẫn liệt kê là một nhóm người dùng ⇒ seed 10, không phải 9;
 /// FR-20-03 đòi chúng phải sao chép và điều chỉnh được, nên `laMacDinh` phân biệt
 /// vai trò hệ thống dựng sẵn với vai trò do quản trị tạo (FR-20-02).
 model VaiTro {
   id           Int      @id @default(autoincrement())
-  /// Mã viết tắt theo §8: QTHT, QLK, TK, NVK, QC, MH, KD, KT, CSKH.
+  /// Mã viết tắt: QTHT, QLK, TK, NVK, QC, MH, KD, KT, CSKH (§8) + KTNB (§2.2).
   ma           String   @unique @db.VarChar(20)
   ten          String   @db.VarChar(100)
   laMacDinh    Boolean  @map("la_mac_dinh") @default(false)

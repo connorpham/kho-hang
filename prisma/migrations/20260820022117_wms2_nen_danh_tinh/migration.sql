@@ -307,6 +307,20 @@ CREATE TRIGGER "nhat_ky_thao_tac_chan_truncate"
 ALTER TABLE "nhat_ky_thao_tac" ENABLE ALWAYS TRIGGER "nhat_ky_thao_tac_chi_ghi_them";
 ALTER TABLE "nhat_ky_thao_tac" ENABLE ALWAYS TRIGGER "nhat_ky_thao_tac_chan_truncate";
 
+-- ── NFR-SEC-03: mat_khau_hash phải LÀ một chuỗi băm, không phải mật khẩu ────
+-- NFR-SEC-03 viết "tuyệt đối không lưu ở dạng rõ hay mã hoá hai chiều". Trước
+-- ràng buộc này KHÔNG có gì thi hành câu đó: reviewer R3 nhét thẳng chuỗi rõ
+-- 'MatKhau@123' vào cột và cả 27 test vẫn xanh.
+-- Cho phép ĐÚNG BA họ thuật toán mà NFR-SEC-03 nêu tên, không hơn:
+--   bcrypt  $2a$ / $2b$ / $2y$      scrypt  $scrypt$      Argon2  $argon2i|d|id$
+-- Chặn hẹp hơn (ví dụ chỉ Argon2) là tự thu hẹp spec; chặn rộng hơn thì không
+-- chặn gì. Đây là ràng buộc ĐỊNH DẠNG — nó không chứng minh được chuỗi kia là
+-- băm THẬT của mật khẩu nào; việc đó thuộc ticket có mã xác thực (WMS-3).
+ALTER TABLE "nguoi_dung"
+  ADD CONSTRAINT "nguoi_dung_mat_khau_phai_la_bam" CHECK (
+    "mat_khau_hash" ~ '^\$(2[aby]\$|scrypt\$|argon2(id|i|d)\$)'
+  );
+
 -- ── FR-20-02: danh mục quyền = 20 màn hình × 6 hành động ────────────────────
 -- ON CONFLICT: chạy lại khối này không được nổ. R2 chỉ ra bản đầu không
 -- idempotent, và chính điều đó khoá chết đường phục hồi khi migration hỏng dở.
