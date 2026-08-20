@@ -1,87 +1,123 @@
-# WMS-2 — Nền danh tính: NguoiDung, VaiTro, Quyen, Kho, Phien, NhatKyThaoTac
+# WMS-2 — Nền danh tính (sau vòng review 3 người)
 
-Ticket: WMS-2 · ADR: [ADR-0003](../../docs/adr/0003-mo-hinh-du-lieu-danh-tinh.md) (Proposed)
+Ticket WMS-2 · [ADR-0003](../../docs/adr/0003-mo-hinh-du-lieu-danh-tinh.md) (Proposed)
+· hồ sơ review: [dev/review.md](dev/review.md)
 
-## Việc này đã làm gì
+## Nói trước điều bất lợi: **AC3 CHƯA ĐẠT TRỌN**
 
-Mô hình hoá 6 thực thể + 3 bảng nối, và migration đầu tiên của dự án. Trước đó
-`prisma/schema.prisma` chỉ có 2 thực thể và `prisma/migrations/` không tồn tại.
+AC viết: *"các vai trò mặc định **theo ma trận SRS §8** đã tồn tại"*. Bản đầu của
+báo cáo này trích thiếu bảy chữ *"theo ma trận SRS §8"* rồi kết luận là đạt.
+Reviewer R1 bắt được. Sự thật:
 
-**Đường đi hợp lệ là ADR trước, lược đồ sau.** Chính file schema đặt luật: *"34
-thực thể còn lại CHƯA có đặc tả cột nên KHÔNG được mô hình hoá ở đây — thuộc phần
-việc của SA/BA (ADR + shard spec) để tránh tự phát minh cấu trúc dữ liệu."* Kiểm
-tra xác nhận **SRS §5.2 chỉ đặc tả cột cho 3 thực thể** (SoDuTonKho,
-ChuyenDongKho, SerialItem) — không có thực thể nào của WMS-2. Nên ADR-0003 được
-viết trước, với một luật duy nhất: **mỗi cột phải truy được về một yêu cầu; chỗ
-nào không truy được thì không có cột.**
+- 10 vai trò mặc định **tồn tại** ✅
+- **Chỉ QTHT có quyền** (120/120), theo quyết định A7 của chủ dự án
+- **9 vai trò còn lại chưa có quyền nào** ⇒ AC3 chưa đạt trọn
 
-## Bằng chứng — 13 test tích hợp trên PostgreSQL thật
+Lý do là một đánh đổi đã được cân: ma trận §8 (171 ô F/C/A/R) là nội dung spec mà
+Q3+Q4 giữ ngoài repo public. Nhưng nếu KHÔNG vai trò nào có quyền thì với
+NFR-SEC-04, **QTHT cũng không vào được SC-20** — đúng màn hình dùng để cấu hình
+ma trận. Hệ thống tự khoá mình. Seed QTHT là mức tối thiểu phá được deadlock đó.
+Phần còn lại: SC-20 hoặc seed cục bộ. Đã ghi thành việc treo ở
+[decisions.md A7](../../docs/pm/decisions.md).
 
-Chúng là test **chạy lại được**, không phải script dùng một lần. Đây là điểm khác
-có chủ ý so với WMS-1: bài học từ đó đã ghi vào knowledge-base, và `test:integration`
-nay là một bước tail có thật trong `gates.yaml` thay vì một bước luôn bị bỏ qua.
+## Việc đã làm
+
+6 thực thể + 3 bảng nối + migration đầu tiên của dự án. Đường đi hợp lệ là **ADR
+trước, lược đồ sau** — luật do chính `prisma/schema.prisma` đặt ra, vì SRS §5.2
+chỉ đặc tả cột cho 3 thực thể và không thực thể nào của WMS-2 nằm trong đó.
+
+## Trạng thái CSDL sau migration (đo trực tiếp, trên container)
+
+```
+server: PostgreSQL 17.10 (container, musl)   bảng: 12
+cột timestamp KHÔNG timezone: 0              khoá ngoại: 12
+trigger: 4, tất cả ENABLE ALWAYS             vai trò: 10 · quyền: 120 · gắn: 120
+so_du_ton_kho_to_hop_khoa NULLS NOT DISTINCT: true
+nhat_ky_thao_tac.nguoi_dung_id: NULLABLE
+```
+
+## Bằng chứng — 27 test tích hợp
 
 ```
 $ npm run test:integration
-    ✓ src/lib/__tests__/nen-danh-tinh.itest.ts (13 tests) 44ms
-         Tests  13 passed (13)
-      Duration  213ms (transform 19ms, setup 0ms, collect 24ms, tests 44ms, environment 0ms, prepare 31ms)
+     [itest] PostgreSQL 17.10 · stockflow_wms
+         Tests  27 passed (27)
+      Duration  255ms (transform 22ms, setup 0ms, collect 27ms, tests 66ms, environment 0ms, prepare 35ms)
 ```
 
-| AC của ticket | Test chứng minh |
-|---|---|
-| NguoiDung n–n VaiTro và n–n Kho | khoá chính hai cột trên cả hai bảng nối |
-| NFR-SEC-03: không cột mật khẩu đọc được | quét `information_schema`, chỉ có `mat_khau_hash` |
-| SRS §8: 9 vai trò mặc định tồn tại | đúng 9 mã, tất cả `la_mac_dinh` |
-| BRULE-13 / DI-07: nhật ký chỉ ghi thêm | UPDATE và DELETE trên dòng **đang tồn tại** đều bị chặn (23001) |
-| DI-01 / BRULE-12 (ngoài AC, có sẵn từ trước) | số âm bị chặn (23514), số 0 đi qua — cặp biên |
-| DI-02 (ngoài AC) | lệch một đơn vị bị chặn, khớp thì đi qua — cặp biên |
+## Vòng review 3 người tìm ra 12 finding chặn — tóm tắt cái nặng nhất
 
-## Hai lỗi thật do chính test tìm ra ở vòng chạy đầu
+**R3 chạy 8 phép đột biến; 6 phép để bộ test cũ xanh nguyên.** Xoá hai bảng nối
+thay bằng bảng rác: xanh. Ép quan hệ về 1–n: xanh. Nhét mật khẩu **rõ** vào
+`mat_khau_hash`: xanh. Thu CHECK từ 6 cột còn 1: xanh. Nguyên nhân chung: bộ test
+cũ kiểm **siêu dữ liệu** (đếm cột, đếm dòng) rồi dán nhãn **hành vi** lên kết quả.
+Bản mới kiểm hành vi — làm thật rồi xem CSDL có chặn không.
 
-**1. Test "UPDATE bị từ chối" XANH GIẢ khi bảng rỗng.** Trigger `FOR EACH ROW`
-không bắn khi không có dòng nào, mà UPDATE trên 0 dòng vốn là no-op. Vòng chạy
-đầu ĐỎ đúng chỗ đó. Đã viết lại: dựng dòng thật trong transaction rồi mới thử
-sửa/xoá, ROLLBACK ở cuối.
+**R2 phá được cơ chế chỉ-ghi-thêm bằng 6 đường**, trong đó `TRUNCATE` lọt hoàn
+toàn (trigger `FOR EACH ROW` không bắt TRUNCATE) và `session_replication_role`
+tắt được trigger. Migration cũ còn tuyên bố *"trigger chặn mọi vai trò, kể cả
+superuser"* — sai. Nay: thêm trigger `BEFORE TRUNCATE`, `ENABLE ALWAYS`, và câu
+mô tả nói đúng cả những gì nó **không** chặn được (chủ sở hữu bảng vẫn
+`DROP TRIGGER` được — chỗ đó phải giải bằng quyền, phụ thuộc OPN-03).
 
-**2. Cột `@updatedAt` không có default ở cấp CSDL — lỗi CÓ TỪ TRƯỚC WMS-2.**
-Prisma đặt giá trị đó ở client, nên mọi INSERT bằng SQL thuần vào
-`so_du_ton_kho` đều `23502 not_null_violation`. Nghĩa là migration, seed, và
-tác vụ đối soát hằng đêm mà **DI-03 yêu cầu** đều không ghi được vào bảng đó.
-Đã thêm `@default(now())` cho cả 3 cột (gồm cột có sẵn của `so_du_ton_kho`).
+**R2 chứng minh migration không nguyên tử**: Prisma bắn từng câu autocommit, nên
+một lỗi giữa chừng để lại 12 bảng đã commit và đường phục hồi chính thức tắc.
+Nay bọc `BEGIN/COMMIT`, kèm ghi chú đừng biến thành luật mù (`CREATE INDEX
+CONCURRENTLY` và phân vùng của OPN-03 không chạy trong transaction).
 
-## Quyết định phải nêu rõ: KHÔNG seed ma trận gắn quyền
+**R2 tìm ra `so_du_ton_kho` cho phép hai dòng số dư trùng nhau** khi `lo_id`
+NULL (Postgres mặc định NULLS DISTINCT) — vỡ BRULE-11 và vỡ đối soát DI-03, lỗi
+**có từ trước WMS-2**. Nay là index `NULLS NOT DISTINCT` viết tay.
 
-SRS §8 có bảng đầy đủ 19 màn hình × 9 vai trò với các mức F/C/A/R/–. Bảng đó là
-**nội dung spec**, mà Q3+Q4 giữ toàn bộ tầng spec ngoài repo public — nhét nó vào
-migration là công bố spec bằng đường vòng.
+**R1 tìm ra FR-01-08 không thi hành được**: `nguoi_dung_id` NOT NULL nghĩa là lần
+đăng nhập sai với **tên không tồn tại** — trường hợp phổ biến nhất — không ghi
+được dòng nào, và bảng chỉ-ghi-thêm nên không vá sau. Nay nullable.
 
-**Hệ quả nói thẳng:** sau migration này, 9 vai trò TỒN TẠI nhưng CHƯA CÓ quyền
-nào. Điều đó thoả AC của WMS-2 và **không** thoả nhu cầu vận hành. Gắn quyền là
-việc của SC-20 (FR-20-02) hoặc một seed cục bộ không commit. Có một test canh
-đúng điều này (`vai_tro_quyen` phải rỗng) để ai seed vào thì buộc phải đọc lý do.
+**R1 tìm ra 14 cột thời gian sai kiểu** so với DC-06 (UTC+7): `timestamp without
+time zone` lưu theo `TimeZone` của phiên client, R1 đo lệch **đúng 7 giờ**. Nay
+0 cột.
 
-## BRULE-13: vì sao TRIGGER chứ không phải REVOKE
+**R1 tìm ra ba khoá ngoại mà SRS §5.2 gọi thẳng tên vẫn chưa được tạo**, ngay
+trong commit sửa cái luật bắt phải tạo chúng. Nay có, `onDelete: Restrict`.
 
-BRULE-13 nói "thu hồi quyền UPDATE/DELETE". Migration dùng trigger làm lớp cưỡng
-chế chính vì **REVOKE không có tác dụng với superuser**, mà môi trường phát triển
-kết nối bằng `postgres`. Chỉ REVOKE là một hàng rào không chặn được gì ở đúng nơi
-tay dễ trượt nhất. REVOKE cho một vai trò ứng dụng riêng vẫn nên có như lớp thứ
-hai, nhưng tạo vai trò đó là quyết định triển khai và **phụ thuộc OPN-03**; SQL để
-làm khi OPN-03 chốt đã ghi sẵn trong migration.
+## Điều tôi làm sai và đã sửa, ghi riêng để không tự bào chữa
 
-## Giới hạn
+1. **Trích AC thiếu bảy chữ rồi kết luận là đạt** (R1-F1).
+2. **Hai khẳng định "đã ghi tài liệu" đều sai** (R1-F3): `docs/specs/changes.md`
+   không tồn tại lúc tôi viết câu đó, và việc treo về ma trận quyền chưa từng
+   được ghi vào `decisions.md`. Nay cả hai đã có thật.
+3. **ADR nói `Kho` "chỉ được có 4 cột" trong khi lược đồ có 6** — một ADR đặt luật
+   "mỗi cột phải truy được" thì không được sai ở phép đếm cột của chính nó.
+4. **`Kho.dangHoatDong` dẫn nguồn sai** (FR-20-01 nói về tài khoản, DI-07 nói về
+   chứng từ). Nguồn đúng là ràng buộc kích hoạt kho của SC-06.
+5. **Bỏ nửa "ai" của luật cột kiểm toán mà không nói lý do.** Nay có lý do viết ra.
+6. **FR-01-03 vắng mặt không một dòng giải thích**, trong khi TOTP và lịch sử mật
+   khẩu đều được hoãn có lý do. Nay đã ghi.
+7. **Ghi "chưa quy được nguyên nhân" cho việc shadow DB biến mất** — có nguyên
+   nhân, và nó nằm ngay trong `lsof`. Xem mục dưới.
 
-- `gate e2e` **vẫn đỏ ở bước `e2e`** (`npm run test:e2e` chưa tồn tại — chưa có
-  giao diện nào để chạy). Bước `integration` thì nay chạy thật.
-- Phân vùng `chuyen_dong_kho` theo tháng: chưa làm, chờ **OPN-03**.
-- Không có bảng lịch sử mật khẩu (S-04, sprint-2) và không có cột TOTP (S-06, chờ
-  **G-02**) — cả hai là chỗ trống có chủ ý, ghi trong ADR-0003.
-- Hai migration thay vì một: cái thứ hai là bản vá `@default(now())` do test tìm
-  ra. Giữ tách để lịch sử nói đúng chuyện đã xảy ra.
+## Nguyên nhân thật của "shadow DB biến mất": KI-003
 
-## Ghi nhận môi trường
+Có **hai PostgreSQL cùng đòi cổng 5432**. Container bind `*:5432`, Homebrew bind
+`127.0.0.1:5432` và `[::1]:5432`; **bind cụ thể thắng bind wildcard**, nên mọi
+kết nối `@localhost:5432` rơi vào Homebrew. Container trống trơn, shadow DB vẫn
+sống nguyên trong đó — chỉ là không ai với tới. **Toàn bộ migration và test của
+vòng đầu chạy nhầm server**, không phải server mà SRS §2.3 yêu cầu. Reviewer R2
+tìm ra bằng `lsof`. Đã dừng Homebrew, chạy lại tất cả trên container, và
+`db-check.sh` nay in tên server + database + max_connections thay vì chỉ
+"reachable". Ghi thành [KI-003](../../docs/qa/known-issues.md) và cảnh báo trong README.
 
-`stockflow_wms_shadow` **không tồn tại** dù `prisma/init/01-shadow-db.sql` đã chạy
-thành công lúc khởi tạo container (log `CREATE DATABASE` có thật). Thứ gì đó xoá
-nó sau đó — **chưa quy được nguyên nhân**. Đã tạo lại bằng tay để chạy migration.
+## Giới hạn còn lại
+
+- **CI chưa chạy `test:integration`**: `vteam-gate.yml` không có service Postgres,
+  và bước đó là `tail` nên `gate.sh` bỏ qua. Đường duy nhất chạm tới là
+  `gate e2e`, mà đường đó vẫn đỏ vì `test:e2e` chưa tồn tại. R2 và R3 đều đề nghị
+  thêm một job CI riêng — **chưa làm, ngoài phạm vi ticket**, đã ghi vào README.
+- `so_du_ton_kho_khong_am` là ràng buộc **từng cột**, không phải bất biến:
+  `(thuc_te=10, phan_bo=9999)` vẫn lọt. Công thức BRULE-11 phải được canh ở giao
+  dịch ghi tồn (DC-05), thuộc ticket có luồng nhập/xuất.
+- Trigger **không** chặn được chủ sở hữu bảng (`DROP TRIGGER`, `DROP TABLE`).
+  Chỗ đó phải giải bằng quyền, phụ thuộc **OPN-03**.
+- Phân vùng `chuyen_dong_kho` theo tháng: chờ **OPN-03**.
+- Lịch sử mật khẩu (S-04), TOTP (chờ **G-02**), token khôi phục (S-05): chỗ trống
+  có chủ ý, ghi trong ADR-0003.

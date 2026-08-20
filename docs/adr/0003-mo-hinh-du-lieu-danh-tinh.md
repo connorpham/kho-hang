@@ -38,8 +38,15 @@ dự phòng cho tính năng chưa ai yêu cầu.
 
 ### Chỗ phải đoán, và đoán tối thiểu tới mức nào
 
-**`Kho` chỉ được có 4 cột: `id`, `ma`, `ten`, `dangHoatDong`.** Không địa chỉ,
-không toạ độ, không loại kho, không giờ làm việc — SRS không yêu cầu cái nào.
+**`Kho` chỉ được có 6 cột: `id`, `ma`, `ten`, `dangHoatDong`, `taoLuc`,
+`capNhatLuc`.** Không địa chỉ, không toạ độ, không loại kho, không giờ làm việc —
+SRS không yêu cầu cái nào. *(Bản đầu của ADR này viết "4 cột" rồi lược đồ có 6:
+hai cột thời gian bị quên khi đếm. Reviewer R1 bắt được — một ADR đặt luật "mỗi
+cột phải truy được" thì không được sai ngay ở phép đếm cột của chính nó.)*
+`dangHoatDong` truy về ràng buộc SC-06 *"mỗi kho phải có tối thiểu một vị trí
+Tiếp nhận và một vị trí Cách ly trước khi được kích hoạt"* — **không** phải
+FR-20-01 (nói về tài khoản người dùng) hay DI-07 (nói về chứng từ) như bản đầu
+dẫn nhầm.
 WMS-2 cần `Kho` **chỉ để làm đích cho phạm vi kho của BR-22**; cấu trúc kho bốn
 cấp (Kho → Khu vực → Kệ → Ô chứa) và mã vị trí là **việc của SC-06** và còn đang
 chờ **TBD-01**. Thêm cột bây giờ là phát minh, và tệ hơn: nó sẽ va vào thiết kế
@@ -60,10 +67,38 @@ chế BRULE-13 đang dùng cho `chuyen_dong_kho`. Lý do: ST-15 (kiểm toán n�
 truy vết được **mọi** thay đổi tồn kho theo người/thời gian/lý do, và PB-07 nói
 hiện trạng không có gì để lần. Một nhật ký sửa được thì không phải nhật ký.
 
-**3. Nhật ký giữ `ten_dang_nhap_luc_ghi` bên cạnh khoá ngoại `nguoi_dung_id`.**
+**3. `nhat_ky_thao_tac.nguoi_dung_id` là NULLABLE.** FR-01-08 bắt ghi nhật ký
+**mọi** lần đăng nhập thất bại — kể cả khi tên đăng nhập không tồn tại, vốn là
+trường hợp phổ biến nhất và là trường hợp mà ràng buộc chống dò tài khoản của
+SC-01 buộc phải xử lý. NOT NULL + khoá ngoại thì dòng đó **không ghi được**, và
+bảng chỉ-ghi-thêm nên không vá bằng dữ liệu sau. Reviewer R1 chỉ ra rằng WMS-6
+(S-07) sẽ đâm thẳng vào đây.
+
+**4. Nhật ký giữ `ten_dang_nhap_luc_ghi` bên cạnh khoá ngoại `nguoi_dung_id`.**
 Đổi tên đăng nhập sau này **không được viết lại lịch sử** (luật "dữ liệu lịch sử
 là bất biến" trong bảng kiểm tra dữ liệu của BA). Khoá ngoại trả lời "ai", chuỗi
 lưu kèm trả lời "lúc đó họ tên gì".
+
+### Vì sao KHÔNG có cột "ai tạo / ai sửa"
+
+Luật cột kiểm toán của BA là **"ai / khi nào"**. Lược đồ này chỉ có nửa "khi nào"
+(`taoLuc`, `capNhatLuc`). Nửa "ai" **cố ý không lặp thành cột**: FR-20-09 đã bắt
+ghi nhật ký mọi hành động tạo/sửa/xoá kèm người thực hiện, thời điểm, IP, giá trị
+trước và sau — `NhatKyThaoTac` là house of record cho câu hỏi đó. Thêm
+`nguoi_tao_id` vào từng bảng là chép một sự thật ra hai chỗ, và hai chỗ đó sẽ
+lệch nhau. *(Bản đầu bỏ nửa "ai" mà không nói lý do; đó là bỏ sót im lặng, và
+reviewer R1 tính là finding — đúng.)*
+
+### Khoá ngoại tới `Kho` và `NguoiDung` được tạo NGAY trong ticket này
+
+Luật ở đầu `prisma/schema.prisma` nói: *"khi SA mô hình hoá xong, thay bằng
+`@relation`"*. WMS-2 mô hình hoá xong `Kho` và `NguoiDung`, nên ba khoá ngoại mà
+SRS §5.2 gọi thẳng tên đến hạn ngay: `so_du_ton_kho.kho_id`,
+`chuyen_dong_kho.kho_id`, `chuyen_dong_kho.nguoi_thuc_hien_id` — tất cả
+`onDelete: Restrict`. Không có chúng thì xoá một người dùng là sổ chuyển động mất
+luôn thông tin "ai làm": bất biến nhưng không đọc được, tức vô dụng với ST-15.
+Các khoá ngoại còn lại (`san_pham_id`, `vi_tri_id`, `lo_id`, `serial_item_id`)
+vẫn là cột trần vì các thực thể đó chưa tồn tại.
 
 ## Hệ quả
 
@@ -76,6 +111,9 @@ lưu kèm trả lời "lúc đó họ tên gì".
 - **Không có bảng lịch sử mật khẩu**, dù ràng buộc SC-01 cấm tái dùng 5 mật khẩu
   gần nhất — việc đó thuộc **S-04 (sprint-2)**. WMS-2 để lại chỗ trống có chủ ý,
   không phải bỏ sót.
+- **Không có chỗ lưu token khôi phục mật khẩu.** FR-01-03 (liên kết hiệu lực 30
+  phút, dùng một lần) cần token + hạn + cờ đã dùng. Thuộc **S-05 (sprint-2)**, và
+  bản đầu của ADR này **quên nêu** — reviewer R1 tính là bỏ sót im lặng, đúng.
 - **Không có cột TOTP.** FR-01-05 bắt buộc 2FA cho QTHT/QLK, nhưng **G-02 chưa
   trả lời** (mất thiết bị thì khôi phục đường nào) và cách khôi phục quyết định
   mô hình dữ liệu. Thêm cột trước khi biết là đoán.

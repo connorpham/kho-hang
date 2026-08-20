@@ -40,6 +40,8 @@ datasource db {
 model SoDuTonKho {
   id              BigInt   @id @default(autoincrement())
   sanPhamId       BigInt   @map("san_pham_id")
+  /// SRS §5.2.1 gọi thẳng "Khóa ngoại tới Kho". Kho đã tồn tại từ WMS-2 nên
+  /// luật ở đầu file ("khi SA mô hình hoá xong, thay bằng @relation") đến hạn.
   khoId           BigInt   @map("kho_id")
   viTriId         BigInt   @map("vi_tri_id")
   /// Bắt buộc khi sản phẩm truy vết theo lô.
@@ -56,9 +58,11 @@ model SoDuTonKho {
   /// @updatedAt chỉ được Prisma client đặt. Không có @default thì mọi INSERT
   /// bằng SQL thuần (migration, seed, tác vụ đối soát của DI-03) đều 23502.
   /// Test tích hợp WMS-2 phát hiện; lỗi này có từ trước WMS-2.
-  capNhatLuc      DateTime @map("cap_nhat_luc") @default(now()) @updatedAt
+  capNhatLuc      DateTime @map("cap_nhat_luc") @default(now()) @updatedAt @db.Timestamptz(3)
   /// Kiểm soát tương tranh lạc quan.
   phienBan        Int      @map("phien_ban") @default(0)
+
+  kho             Kho      @relation(fields: [khoId], references: [id], onDelete: Restrict)
 
   // BRULE-12 (mọi cột số lượng >= 0) là CHECK constraint — Prisma không sinh
   // được, phải thêm bằng SQL thủ công trong migration đầu tiên.
@@ -94,9 +98,14 @@ model ChuyenDongKho {
   /// Bắt buộc với giao dịch loại DIEU_CHINH.
   lyDoId           BigInt?  @map("ly_do_id")
 
+  /// Sổ kho bất biến mà không đọc được "ai làm" thì vô dụng với ST-15: khoá
+  /// ngoại RESTRICT chặn việc xoá người dùng còn dấu vết trong sổ.
   nguoiThucHienId  BigInt   @map("nguoi_thuc_hien_id")
   /// Thời điểm phát sinh — không thể sửa.
-  thoiDiem         DateTime @map("thoi_diem")
+  thoiDiem         DateTime @map("thoi_diem") @db.Timestamptz(3)
+
+  kho              Kho       @relation(fields: [khoId],           references: [id], onDelete: Restrict)
+  nguoiThucHien    NguoiDung @relation(fields: [nguoiThucHienId], references: [id], onDelete: Restrict)
 
   @@index([sanPhamId, khoId, thoiDiem])
   @@index([loaiChungTu, chungTuId])
@@ -106,6 +115,14 @@ model ChuyenDongKho {
 
 // ════════════════════════════════════════════════════════════════════════════
 // NHÓM DANH TÍNH — WMS-2 · ADR-0003
+//
+// VÌ SAO KHÔNG CÓ CỘT "AI TẠO / AI SỬA" trên các bảng này:
+// Luật cột kiểm toán của BA là "ai / khi nào". Nửa "khi nào" nằm ở tao_luc và
+// cap_nhat_luc. Nửa "ai" KHÔNG lặp lại thành cột, vì FR-20-09 đã bắt ghi nhật ký
+// mọi hành động tạo/sửa/xoá kèm người thực hiện, thời điểm, IP, giá trị trước và
+// sau — nhat_ky_thao_tac là house of record cho câu hỏi đó. Thêm nguoi_tao_id
+// vào từng bảng là chép một sự thật ra hai chỗ, và hai chỗ đó sẽ lệch nhau.
+// (Bản đầu bỏ nửa "ai" mà không nói lý do; reviewer R1 bắt được.)
 // SRS §5.1 có liệt kê những thực thể này nhưng §5.2 KHÔNG đặc tả cột, nên nguồn
 // suy ra của TỪNG cột được ghi ngay tại chỗ. Không cột nào ở đây "cho chắc".
 // ════════════════════════════════════════════════════════════════════════════
@@ -119,13 +136,18 @@ model Kho {
   /// FR-06-02 dùng mã kho làm tiền tố mã vị trí ⇒ mã phải duy nhất.
   ma            String   @unique @db.VarChar(20)
   ten           String   @db.VarChar(200)
-  /// FR-20-01 cho phép vô hiệu hoá; DI-07 cấm xoá vật lý chứng từ, giữ cùng lối.
+  /// Nguồn ĐÚNG là ràng buộc SC-06: "mỗi kho phải có tối thiểu một vị trí Tiếp
+  /// nhận và một vị trí Cách ly TRƯỚC KHI ĐƯỢC KÍCH HOẠT" — tức kho có trạng
+  /// thái hoạt động. (Bản đầu dẫn nhầm FR-20-01, vốn nói về tài khoản người
+  /// dùng, và DI-07, vốn nói về chứng từ. Reviewer R1 bắt được.)
   dangHoatDong  Boolean  @map("dang_hoat_dong") @default(true)
-  taoLuc        DateTime @map("tao_luc")   @default(now())
-  capNhatLuc    DateTime @map("cap_nhat_luc") @default(now()) @updatedAt
+  taoLuc        DateTime @map("tao_luc")   @default(now()) @db.Timestamptz(3)
+  capNhatLuc    DateTime @map("cap_nhat_luc") @default(now()) @updatedAt @db.Timestamptz(3)
 
   nguoiDungKho  NguoiDungKho[]
   phien         Phien[]
+  soDuTonKho    SoDuTonKho[]
+  chuyenDongKho ChuyenDongKho[]
 
   @@map("kho")
 }
@@ -139,7 +161,7 @@ model VaiTro {
   ma           String   @unique @db.VarChar(20)
   ten          String   @db.VarChar(100)
   laMacDinh    Boolean  @map("la_mac_dinh") @default(false)
-  taoLuc       DateTime @map("tao_luc") @default(now())
+  taoLuc       DateTime @map("tao_luc") @default(now()) @db.Timestamptz(3)
 
   quyen        VaiTroQuyen[]
   nguoiDung    NguoiDungVaiTro[]
@@ -187,23 +209,24 @@ model NguoiDung {
   matKhauHash       String    @map("mat_khau_hash") @db.VarChar(255)
   /// FR-01-04: null = chưa từng đổi ⇒ buộc đổi ở lần đăng nhập đầu; quá 90 ngày
   /// ⇒ buộc đổi định kỳ. Một cột trả lời cả hai vế, không cần cờ riêng.
-  matKhauDoiLuc     DateTime? @map("mat_khau_doi_luc")
+  matKhauDoiLuc     DateTime? @map("mat_khau_doi_luc") @db.Timestamptz(3)
   /// FR-20-01 vô hiệu hoá tài khoản. ADR-0002 đọc cờ này TRONG cùng lượt đọc
   /// phiên ⇒ NFR-SEC-08 (hiệu lực ≤2 phút) đạt ở mức 0 phút.
   dangHoatDong      Boolean   @map("dang_hoat_dong") @default(true)
   /// FR-01-02: khoá 30 phút sau 5 lần sai liên tiếp TRONG 15 phút. Cần cả mốc
   /// lần sai đầu (để biết cửa sổ 15 phút) lẫn mốc hết khoá.
   soLanSaiLienTiep  Int       @map("so_lan_sai_lien_tiep") @default(0)
-  saiDauTienLuc     DateTime? @map("sai_dau_tien_luc")
-  khoaDenLuc        DateTime? @map("khoa_den_luc")
+  saiDauTienLuc     DateTime? @map("sai_dau_tien_luc") @db.Timestamptz(3)
+  khoaDenLuc        DateTime? @map("khoa_den_luc") @db.Timestamptz(3)
 
-  taoLuc            DateTime  @map("tao_luc") @default(now())
-  capNhatLuc        DateTime  @map("cap_nhat_luc") @default(now()) @updatedAt
+  taoLuc            DateTime  @map("tao_luc") @default(now()) @db.Timestamptz(3)
+  capNhatLuc        DateTime  @map("cap_nhat_luc") @default(now()) @updatedAt @db.Timestamptz(3)
 
   vaiTro            NguoiDungVaiTro[]
   kho               NguoiDungKho[]
   phien             Phien[]
   nhatKy            NhatKyThaoTac[]
+  chuyenDongKho     ChuyenDongKho[]
 
   @@map("nguoi_dung")
 }
@@ -244,11 +267,11 @@ model Phien {
   /// FR-01-06 — kho làm việc là trạng thái CỦA PHIÊN, không của tài khoản.
   /// Null hợp lệ trong khoảnh khắc sau đăng nhập, trước khi người dùng chọn kho.
   khoHienTaiId     BigInt?   @map("kho_hien_tai_id")
-  taoLuc           DateTime  @map("tao_luc") @default(now())
+  taoLuc           DateTime  @map("tao_luc") @default(now()) @db.Timestamptz(3)
   /// ADR-0002 §Quyết định 3: gộp ghi mỗi 60 giây ⇒ ngưỡng 30 phút của FR-01-07
   /// chính xác tới ±60 giây. Đây là đánh đổi đã ghi, không phải lỗi.
-  thaoTacCuoiLuc   DateTime  @map("thao_tac_cuoi_luc") @default(now())
-  hetHanLuc        DateTime  @map("het_han_luc")
+  thaoTacCuoiLuc   DateTime  @map("thao_tac_cuoi_luc") @default(now()) @db.Timestamptz(3)
+  hetHanLuc        DateTime  @map("het_han_luc") @db.Timestamptz(3)
   /// FR-01-08 ghi IP mỗi lần đăng nhập.
   diaChiIp         String    @map("dia_chi_ip") @db.Inet
 
@@ -267,7 +290,13 @@ model Phien {
 /// cho chuyen_dong_kho. Một nhật ký sửa được thì không phải nhật ký.
 model NhatKyThaoTac {
   id                 BigInt   @id @default(autoincrement())
-  nguoiDungId        BigInt   @map("nguoi_dung_id")
+  /// NULLABLE có chủ ý. FR-01-08 bắt ghi nhật ký MỌI lần đăng nhập thất bại,
+  /// kể cả khi tên đăng nhập không tồn tại — mà đó chính là trường hợp phổ biến
+  /// nhất, và là trường hợp ràng buộc chống dò tài khoản của SC-01 buộc phải xử
+  /// lý. NOT NULL + khoá ngoại thì dòng đó không ghi được, và bảng chỉ-ghi-thêm
+  /// nên không vá bằng dữ liệu sau. Cột ten_dang_nhap_luc_ghi vẫn luôn có giá
+  /// trị, nên "ai đã thử" không mất.
+  nguoiDungId        BigInt?  @map("nguoi_dung_id")
   /// Lịch sử KHÔNG được viết lại: đổi tên đăng nhập sau này không được làm đổi
   /// bản ghi cũ. Khoá ngoại trả lời "ai", cột này trả lời "lúc đó họ tên gì".
   tenDangNhapLucGhi  String   @map("ten_dang_nhap_luc_ghi") @db.VarChar(50)
@@ -281,9 +310,9 @@ model NhatKyThaoTac {
   giaTriTruoc        Json?    @map("gia_tri_truoc")
   giaTriSau          Json?    @map("gia_tri_sau")
   diaChiIp           String   @map("dia_chi_ip") @db.Inet
-  thoiDiem           DateTime @map("thoi_diem") @default(now())
+  thoiDiem           DateTime @map("thoi_diem") @default(now()) @db.Timestamptz(3)
 
-  nguoiDung          NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: Restrict)
+  nguoiDung          NguoiDung? @relation(fields: [nguoiDungId], references: [id], onDelete: Restrict)
 
   /// FR-20-11: tìm theo người dùng, khoảng thời gian, loại đối tượng, mã chứng từ
   /// — dưới 5 giây trên dữ liệu 12 tháng.

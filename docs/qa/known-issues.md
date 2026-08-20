@@ -35,3 +35,21 @@ phải có tiền tố `mockup:` / `design node:` / URL figma. Đã ghi thành m
 Sửa dứt điểm: bổ sung từ khoá tiếng Việt vào regex của dor_check — thuộc harness
 vteam, không sửa trong repo này.
 
+## KI-003 · Hai PostgreSQL cùng đòi cổng 5432 — mọi thứ chạy nhầm server trong im lặng
+Symptom: `db-check.sh` xanh, migration chạy "thành công", test xanh — nhưng
+container `stockflow-db` trống trơn và `stockflow_wms_shadow` "không tồn tại" dù
+`prisma/init/01-shadow-db.sql` đã chạy đúng lúc khởi tạo (log có `CREATE DATABASE`).
+Cause: README mời dùng **cả hai** cách dựng CSDL — container (`docker compose up -d db`)
+và Homebrew (`brew services start postgresql@17`) — mà chúng loại trừ nhau. Container
+bind `*:5432` (wildcard), Homebrew bind `127.0.0.1:5432` và `[::1]:5432` (cụ thể).
+**Bind cụ thể thắng bind wildcard**, nên mọi kết nối `@localhost:5432` rơi vào
+Homebrew. Shadow DB chỉ tồn tại trong container nên biến mất khỏi tầm với.
+Chẩn đoán: `lsof -nP -iTCP:5432 -sTCP:LISTEN` — hai tiến trình là đã sai.
+`bash .vteam/db-check.sh` nay in `version()` + `current_database()` + `max_connections`;
+container là `PostgreSQL 17.10` (musl), Homebrew là `17.11 (Homebrew)`.
+Workaround: `brew services stop postgresql@17`, rồi chạy lại migration.
+Sửa dứt điểm: chọn MỘT cách dựng CSDL (SRS §2.3 yêu cầu container), hoặc đổi cổng
+container sang 5433. README đã sửa để nói rõ hai cách loại trừ nhau.
+Phát hiện bởi reviewer R2 ở vòng review WMS-2, sau khi tác giả ghi nhầm nguyên
+nhân là "chưa quy được".
+
