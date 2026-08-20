@@ -7,9 +7,15 @@
 //   KHÔNG được mô hình hoá ở đây — chúng thuộc phần việc của SA/BA (ADR + shard
 //   spec) để tránh tự phát minh cấu trúc dữ liệu.
 //
-//   Vì các thực thể được tham chiếu (SanPham, Kho, ViTri, Lo, SerialItem,
-//   NguoiDung) chưa tồn tại, các khoá ngoại dưới đây là cột BigInt trần, chưa
-//   có quan hệ Prisma. Khi SA mô hình hoá xong, thay bằng @relation.
+//   Vì các thực thể được tham chiếu (SanPham, ViTri, Lo, SerialItem) chưa tồn
+//   tại, các khoá ngoại tới chúng vẫn là cột BigInt trần, chưa có quan hệ Prisma.
+//   Khi SA mô hình hoá xong, thay bằng @relation.
+//
+//   CẬP NHẬT 2026-08-20 (WMS-2, ADR-0003): nhóm DANH TÍNH đã được mô hình hoá —
+//   NguoiDung, VaiTro, Quyen, Kho, Phien, NhatKyThaoTac cùng 3 bảng nối. Đường
+//   đi hợp lệ là ADR trước, lược đồ sau, đúng như luật ở trên đòi. Mỗi cột trong
+//   nhóm đó truy được về một yêu cầu; chỗ nào không truy được thì không có cột
+//   (xem docs/adr/0003-mo-hinh-du-lieu-danh-tinh.md).
 //
 // Ràng buộc hạ tầng (SRS §2.3 + OPN-03 CHƯA CHỐT):
 //   SRS chỉ yêu cầu "RDBMS hỗ trợ ACID, cô lập tối thiểu READ COMMITTED, khoá
@@ -47,7 +53,10 @@ model SoDuTonKho {
   /// Cột dẫn xuất theo công thức BRULE-11, duy trì đồng bộ.
   soLuongKhaDung  Decimal  @map("so_luong_kha_dung") @db.Decimal(18, 3)
 
-  capNhatLuc      DateTime @map("cap_nhat_luc") @updatedAt
+  /// @updatedAt chỉ được Prisma client đặt. Không có @default thì mọi INSERT
+  /// bằng SQL thuần (migration, seed, tác vụ đối soát của DI-03) đều 23502.
+  /// Test tích hợp WMS-2 phát hiện; lỗi này có từ trước WMS-2.
+  capNhatLuc      DateTime @map("cap_nhat_luc") @default(now()) @updatedAt
   /// Kiểm soát tương tranh lạc quan.
   phienBan        Int      @map("phien_ban") @default(0)
 
@@ -92,4 +101,194 @@ model ChuyenDongKho {
   @@index([sanPhamId, khoId, thoiDiem])
   @@index([loaiChungTu, chungTuId])
   @@map("chuyen_dong_kho")
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// NHÓM DANH TÍNH — WMS-2 · ADR-0003
+// SRS §5.1 có liệt kê những thực thể này nhưng §5.2 KHÔNG đặc tả cột, nên nguồn
+// suy ra của TỪNG cột được ghi ngay tại chỗ. Không cột nào ở đây "cho chắc".
+// ════════════════════════════════════════════════════════════════════════════
+
+/// SRS §5.1 — Kho vật lý. CỐ Ý TỐI THIỂU: WMS-2 chỉ cần Kho làm đích cho phạm vi
+/// kho của BR-22. Cấu trúc bốn cấp (Kho → Khu vực → Kệ → Ô chứa) và quy tắc sinh
+/// mã vị trí thuộc SC-06 và còn chờ TBD-01 — thêm cột bây giờ là phát minh, và
+/// sẽ va vào thiết kế thật của SC-06. ViTri KHÔNG được tạo ở đây.
+model Kho {
+  id            BigInt   @id @default(autoincrement())
+  /// FR-06-02 dùng mã kho làm tiền tố mã vị trí ⇒ mã phải duy nhất.
+  ma            String   @unique @db.VarChar(20)
+  ten           String   @db.VarChar(200)
+  /// FR-20-01 cho phép vô hiệu hoá; DI-07 cấm xoá vật lý chứng từ, giữ cùng lối.
+  dangHoatDong  Boolean  @map("dang_hoat_dong") @default(true)
+  taoLuc        DateTime @map("tao_luc")   @default(now())
+  capNhatLuc    DateTime @map("cap_nhat_luc") @default(now()) @updatedAt
+
+  nguoiDungKho  NguoiDungKho[]
+  phien         Phien[]
+
+  @@map("kho")
+}
+
+/// SRS §5.1 — Vai trò và ma trận quyền. §8 định nghĩa 9 vai trò mặc định;
+/// FR-20-03 đòi chúng phải sao chép và điều chỉnh được, nên `laMacDinh` phân biệt
+/// vai trò hệ thống dựng sẵn với vai trò do quản trị tạo (FR-20-02).
+model VaiTro {
+  id           Int      @id @default(autoincrement())
+  /// Mã viết tắt theo §8: QTHT, QLK, TK, NVK, QC, MH, KD, KT, CSKH.
+  ma           String   @unique @db.VarChar(20)
+  ten          String   @db.VarChar(100)
+  laMacDinh    Boolean  @map("la_mac_dinh") @default(false)
+  taoLuc       DateTime @map("tao_luc") @default(now())
+
+  quyen        VaiTroQuyen[]
+  nguoiDung    NguoiDungVaiTro[]
+
+  @@map("vai_tro")
+}
+
+/// FR-20-02 — quyền là tổ hợp MÀN HÌNH × HÀNH ĐỘNG, không phải enum.
+/// Lý do là enum: mỗi màn hình mới sẽ thành một migration, trong khi FR-20-02
+/// bắt quản trị định nghĩa vai trò tuỳ chỉnh LÚC CHẠY. Danh mục do người dùng
+/// quản lý ⇒ bảng lookup (luật vựng dữ liệu trong docs/team/roles/ba.md).
+model Quyen {
+  id        Int    @id @default(autoincrement())
+  /// Mã màn hình theo SRS: SC-01 … SC-20.
+  manHinh   String @map("man_hinh") @db.VarChar(10)
+  /// FR-20-02 liệt kê đúng 6 hành động: XEM TAO SUA XOA PHE_DUYET KET_XUAT.
+  hanhDong  String @map("hanh_dong") @db.VarChar(20)
+
+  vaiTro    VaiTroQuyen[]
+
+  @@unique([manHinh, hanhDong])
+  @@map("quyen")
+}
+
+model VaiTroQuyen {
+  vaiTroId Int @map("vai_tro_id")
+  quyenId  Int @map("quyen_id")
+
+  vaiTro   VaiTro @relation(fields: [vaiTroId], references: [id], onDelete: Cascade)
+  quyen    Quyen  @relation(fields: [quyenId],  references: [id], onDelete: Cascade)
+
+  @@id([vaiTroId, quyenId])
+  @@map("vai_tro_quyen")
+}
+
+/// SRS §5.1 — Tài khoản người dùng, n–n với VaiTro và Kho.
+/// Mỗi cột dưới đây gắn với một yêu cầu; không có cột dự phòng.
+model NguoiDung {
+  id                BigInt    @id @default(autoincrement())
+  /// FR-01-01: đăng nhập bằng tên đăng nhập HOẶC email nội bộ ⇒ cả hai đều unique.
+  tenDangNhap       String    @unique @map("ten_dang_nhap") @db.VarChar(50)
+  email             String    @unique @db.VarChar(200)
+  hoTen             String    @map("ho_ten") @db.VarChar(200)
+  /// NFR-SEC-03: CHỈ băm (bcrypt/scrypt/Argon2). Không cột nào ở đây hai chiều.
+  matKhauHash       String    @map("mat_khau_hash") @db.VarChar(255)
+  /// FR-01-04: null = chưa từng đổi ⇒ buộc đổi ở lần đăng nhập đầu; quá 90 ngày
+  /// ⇒ buộc đổi định kỳ. Một cột trả lời cả hai vế, không cần cờ riêng.
+  matKhauDoiLuc     DateTime? @map("mat_khau_doi_luc")
+  /// FR-20-01 vô hiệu hoá tài khoản. ADR-0002 đọc cờ này TRONG cùng lượt đọc
+  /// phiên ⇒ NFR-SEC-08 (hiệu lực ≤2 phút) đạt ở mức 0 phút.
+  dangHoatDong      Boolean   @map("dang_hoat_dong") @default(true)
+  /// FR-01-02: khoá 30 phút sau 5 lần sai liên tiếp TRONG 15 phút. Cần cả mốc
+  /// lần sai đầu (để biết cửa sổ 15 phút) lẫn mốc hết khoá.
+  soLanSaiLienTiep  Int       @map("so_lan_sai_lien_tiep") @default(0)
+  saiDauTienLuc     DateTime? @map("sai_dau_tien_luc")
+  khoaDenLuc        DateTime? @map("khoa_den_luc")
+
+  taoLuc            DateTime  @map("tao_luc") @default(now())
+  capNhatLuc        DateTime  @map("cap_nhat_luc") @default(now()) @updatedAt
+
+  vaiTro            NguoiDungVaiTro[]
+  kho               NguoiDungKho[]
+  phien             Phien[]
+  nhatKy            NhatKyThaoTac[]
+
+  @@map("nguoi_dung")
+}
+
+model NguoiDungVaiTro {
+  nguoiDungId BigInt @map("nguoi_dung_id")
+  vaiTroId    Int    @map("vai_tro_id")
+
+  nguoiDung   NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: Cascade)
+  vaiTro      VaiTro    @relation(fields: [vaiTroId],    references: [id], onDelete: Restrict)
+
+  @@id([nguoiDungId, vaiTroId])
+  @@map("nguoi_dung_vai_tro")
+}
+
+/// BR-22 — phạm vi kho là DỮ LIỆU, không phải quy ước. NFR-SEC-04 bắt thực thi ở
+/// tầng máy chủ cho mọi điểm cuối, nên nó phải tra được bằng một câu truy vấn.
+model NguoiDungKho {
+  nguoiDungId BigInt @map("nguoi_dung_id")
+  khoId       BigInt @map("kho_id")
+
+  nguoiDung   NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: Cascade)
+  kho         Kho       @relation(fields: [khoId],       references: [id], onDelete: Restrict)
+
+  @@id([nguoiDungId, khoId])
+  @@map("nguoi_dung_kho")
+}
+
+/// ADR-0002 §Quyết định 1 — thực thể này KHÔNG có trong SRS §5.1; nó là thứ
+/// ADR-0002 thêm vào để thoả đồng thời FR-01-07 (hết phiên 30 phút) và NFR-SEC-08
+/// (thu hồi ≤2 phút), điều mà token tự chứa không làm được. Delta đã ghi ở
+/// docs/specs/changes.md.
+model Phien {
+  /// Mã phiên ngẫu nhiên đủ entropy (ADR-0002). Không dùng số tăng dần: mã phiên
+  /// đoán được là mã phiên mượn được.
+  id               String    @id @db.VarChar(64)
+  nguoiDungId      BigInt    @map("nguoi_dung_id")
+  /// FR-01-06 — kho làm việc là trạng thái CỦA PHIÊN, không của tài khoản.
+  /// Null hợp lệ trong khoảnh khắc sau đăng nhập, trước khi người dùng chọn kho.
+  khoHienTaiId     BigInt?   @map("kho_hien_tai_id")
+  taoLuc           DateTime  @map("tao_luc") @default(now())
+  /// ADR-0002 §Quyết định 3: gộp ghi mỗi 60 giây ⇒ ngưỡng 30 phút của FR-01-07
+  /// chính xác tới ±60 giây. Đây là đánh đổi đã ghi, không phải lỗi.
+  thaoTacCuoiLuc   DateTime  @map("thao_tac_cuoi_luc") @default(now())
+  hetHanLuc        DateTime  @map("het_han_luc")
+  /// FR-01-08 ghi IP mỗi lần đăng nhập.
+  diaChiIp         String    @map("dia_chi_ip") @db.Inet
+
+  nguoiDung        NguoiDung @relation(fields: [nguoiDungId],  references: [id], onDelete: Cascade)
+  kho              Kho?      @relation(fields: [khoHienTaiId], references: [id], onDelete: Restrict)
+
+  /// Dọn phiên hết hạn quét theo cột này (ADR-0002 §Hệ quả).
+  @@index([hetHanLuc])
+  @@map("phien")
+}
+
+/// SRS §5.1 — Nhật ký kiểm toán mọi thao tác, CHỈ GHI THÊM.
+/// PB-07: hiện trạng không có nhật ký nào nên khi tồn lệch không ai chứng minh
+/// được ai sửa gì; ST-15 (kiểm toán nội bộ) cần truy vết theo người/thời gian/lý do.
+/// Quyền UPDATE và DELETE bị THU HỒI trong migration — cùng cơ chế BRULE-13 dùng
+/// cho chuyen_dong_kho. Một nhật ký sửa được thì không phải nhật ký.
+model NhatKyThaoTac {
+  id                 BigInt   @id @default(autoincrement())
+  nguoiDungId        BigInt   @map("nguoi_dung_id")
+  /// Lịch sử KHÔNG được viết lại: đổi tên đăng nhập sau này không được làm đổi
+  /// bản ghi cũ. Khoá ngoại trả lời "ai", cột này trả lời "lúc đó họ tên gì".
+  tenDangNhapLucGhi  String   @map("ten_dang_nhap_luc_ghi") @db.VarChar(50)
+  /// FR-20-09: tạo, sửa, xoá, phê duyệt, kết xuất. FR-01-08 thêm đăng nhập
+  /// thành công và thất bại.
+  hanhDong           String   @map("hanh_dong") @db.VarChar(30)
+  loaiDoiTuong       String   @map("loai_doi_tuong") @db.VarChar(50)
+  doiTuongId         BigInt?  @map("doi_tuong_id")
+  /// FR-20-09 đòi giá trị TRƯỚC và SAU. NFR-SEC-09 cấm ghi mật khẩu, khoá API,
+  /// dữ liệu cá nhân đầy đủ vào nhật ký — lọc ở tầng ứng dụng.
+  giaTriTruoc        Json?    @map("gia_tri_truoc")
+  giaTriSau          Json?    @map("gia_tri_sau")
+  diaChiIp           String   @map("dia_chi_ip") @db.Inet
+  thoiDiem           DateTime @map("thoi_diem") @default(now())
+
+  nguoiDung          NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: Restrict)
+
+  /// FR-20-11: tìm theo người dùng, khoảng thời gian, loại đối tượng, mã chứng từ
+  /// — dưới 5 giây trên dữ liệu 12 tháng.
+  @@index([nguoiDungId, thoiDiem])
+  @@index([loaiDoiTuong, doiTuongId])
+  @@index([thoiDiem])
+  @@map("nhat_ky_thao_tac")
 }

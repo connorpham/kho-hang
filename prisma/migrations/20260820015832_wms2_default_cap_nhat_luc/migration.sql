@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "kho" ALTER COLUMN "cap_nhat_luc" SET DEFAULT CURRENT_TIMESTAMP;
+
+-- AlterTable
+ALTER TABLE "nguoi_dung" ALTER COLUMN "cap_nhat_luc" SET DEFAULT CURRENT_TIMESTAMP;
+
+-- AlterTable
+ALTER TABLE "so_du_ton_kho" ALTER COLUMN "cap_nhat_luc" SET DEFAULT CURRENT_TIMESTAMP;

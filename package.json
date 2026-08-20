@@ -13,7 +13,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "gate": "python3 .vteam/scripts/gate.py"
+    "gate": "python3 .vteam/scripts/gate.py",
+    "test:integration": "node --env-file-if-exists=.env ./node_modules/.bin/vitest run --config vitest.integration.mts"
   },
   "repository": {
     "type": "git",
