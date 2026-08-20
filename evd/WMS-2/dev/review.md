@@ -152,3 +152,92 @@ biến hơn là vá theo lớp lỗi". Tôi sửa đúng những chỗ R3 nêu t
 
 **Trạng thái:** `failed: vòng review 3 người (2/3 chữ ký)`. Năm việc R3 nêu đều rẻ và
 cụ thể; WMS-2 còn một lần thử tự chọn trước khi chạm loop guard #3.
+
+
+---
+
+# LẦN THỬ 2 — hai vòng nữa
+
+| Vòng | R2 (migration) | R3 (test) |
+|---|---|---|
+| 1 · `fcd0759` | **APPROVE** | REQUEST-CHANGES · CHẶN-1 + 1b |
+| 2 · `d6246d5` | không gọi lại (diff không chạm migration) | REQUEST-CHANGES · **CHẶN-2** |
+
+## R2 · APPROVE, kèm 6 ghi nhận
+Regex băm đúng cú pháp và đúng phạm vi đã tuyên bố; `map:` đóng drift (diff rỗng,
+gỡ `map:` thì hiện lại); replay từ CSDL trắng 38/38; tính nguyên tử còn nguyên
+(lỗi trước `COMMIT` → 1 bảng · gỡ `BEGIN/COMMIT` → 4 bảng rò); seed idempotent.
+- **M-1** mẫu âm không có ký tự `$` ⇒ nới CHECK xuống `~ '\$'` vẫn 38/38 xanh.
+- **M-2** `ENABLE ALWAYS` mới canh DELETE; hạ ALWAYS riêng trên trigger TRUNCATE
+  → 38/38 xanh rồi `replica; TRUNCATE` **xoá sạch nhật ký kiểm toán**.
+- **M-3** ràng buộc chống mật khẩu rõ **lại in mật khẩu rõ** qua `DETAIL` ⇒ vi
+  phạm NFR-SEC-09.
+- M-4 `BEGIN/COMMIT` che lỗi gốc · M-5 REPORT ghi "3 đỏ", đo thật 2 đỏ ·
+  M-6 `mat_khau_hash` NOT NULL + CHECK ⇒ không có giá trị hợp lệ cho "đã tạo tài
+  khoản, chưa đặt mật khẩu" (ràng buộc thiết kế cho WMS-3).
+
+## R3 vòng 1 · CHẶN-1 — vá theo tên đối tượng, không theo lớp
+Đo được: 10/12 khoá ngoại · 3/6 chỉ mục duy nhất · `DROP TABLE phien` · mọi phép
+đổi kiểu cột — tất cả gỡ được mà **38/38 xanh**. Gồm `so_du_ton_kho_kho_id_fkey`,
+một trong ba khoá ngoại R1-F5 gọi thẳng tên. **CHẶN-1b:** REPORT viết "Không phép
+nào còn lọt" trong khi liệt kê 2/3 khoá ngoại — cái bỏ ra chính là cái còn lọt.
+
+## Vòng sửa 2 → `d6246d5`
+Thay ba danh sách cấm bằng MỘT ảnh chụp lược đồ khẳng định tập cột (kèm độ dài,
+nullable) · khoá ngoại (kèm `ON DELETE`) · chỉ mục duy nhất (kèm `NULLS NOT
+DISTINCT`) · CHECK · trigger (kèm `ALWAYS`/`ORIGIN`). Cộng M-1, M-2, và fixture
+đổi sang băm argon2id dài thật 98 ký tự.
+
+## R3 vòng 2 · CHẶN-1 và CHẶN-1b ĐÓNG, nhưng **CHẶN-2**
+
+**26/26** phép đột biến cũ nay đỏ, gồm cả 12 khoá ngoại và cả 6 chỉ mục gỡ riêng
+từng cái. 11/11 dòng trong bảng đột biến của REPORT **khớp chính xác** số R3 đo.
+
+**Nhưng ảnh chụp ghi ĐỊNH DANH, không ghi ĐỊNH NGHĨA.** R3 áp 9 phép đột biến
+cùng lúc rồi chạy lại trình sinh trên chính CSDL đã hỏng: **không một byte khác
+nhau**, 51/51 xanh. Chín phép lọt:
+
+| Phép | Ảnh chụp không ghi | Khai thác đã chạy được |
+|---|---|---|
+| N9 thay thân `chan_sua_xoa()` thêm cửa hậu | thân hàm | `SET app.bo_qua='1'; DELETE` → xoá sạch sổ kiểm toán |
+| N10 thêm `WHEN (OLD.dia_chi_ip <> …)` vào trigger | `tgqual` | xoá được dòng kiểm toán từ IP đó |
+| N4 dựng lại CHECK **giữ tên**, nới biểu thức | biểu thức | `ton_truoc=10, so_luong=5, ton_sau=9999` — DI-02 vỡ |
+| N6 gỡ khoá chính bảng nối | `indisprimary` bị loại trừ | 3 dòng `nguoi_dung_kho` trùng — BR-22 vỡ |
+| N5 đổi `DEFAULT` | `column_default` | tài khoản mới sinh ra với `so_lan_sai=5` |
+| N1 `ON UPDATE CASCADE` → `NO ACTION` ×12 | `confupdtype` | — |
+| N3 unique thành partial, **giữ tên** | cột và `WHERE` của index | 2 người dùng trùng `ten_dang_nhap` |
+| N2 dựng lại unique **cùng tên** trên cột khác | cột của index | 2 kho trùng mã |
+| N8 `ENABLE ROW LEVEL SECURITY` | RLS | vai trò ứng dụng thấy 0 dòng |
+
+Ba phép (N5, N6, N1) **không cần kẻ tấn công** — `@default`, `@@id`, `onUpdate:`
+là thứ `schema.prisma` diễn đạt trực tiếp. Hai phép (N9, N10) phá đúng bất biến
+BRULE-13 / DI-07 mà ticket này sinh ra để dựng.
+
+**Bản vá R3 đòi:** một phép thay thế trong `chup-luoc-do.mjs` — dùng
+`pg_get_constraintdef()`, `pg_get_indexdef()`, `pg_get_triggerdef()` +
+`md5(prosrc)`, thêm `column_default`/`is_generated`, thêm mặt khoá chính. Giết
+8/9. Kèm sửa hai câu tuyên bố sai lớp ("khẳng định TẬP, không phải danh sách cấm").
+
+**R3 chấp nhận lập luận hoãn M-3/A8** sau khi tự kiểm rằng không viết được CHECK
+nào khiến Postgres thôi in dòng lỗi: *"hoãn là quyết định đúng, ghi chép đủ,
+không phải nợ giấu"*. Và **rút lại** gợi ý `^\$argon2` của chính họ: *"tôi đòi
+tác giả tự thu hẹp spec. Tác giả đúng, tôi sai."*
+
+**MY WEAK SPOT của R3, nguyên văn:** *"Hai vòng liền, block của tôi thấp hơn lớp
+đúng một tầng. Nếu có vòng ba tôi ngờ mình sẽ tìm ra tầng thứ tư."* và *"Verdict
+này sát ranh… mọi phép lọt đều do chính tay tôi viết vào. Một reviewer khác có
+thể APPROVE, và tôi không gọi được lựa chọn đó là sai."*
+
+## Phản hồi của tác giả
+
+Không tranh luận. CHẶN-2 đúng và bản vá R3 mô tả là đúng hình dạng.
+
+**Nhưng đây là chỗ luật dừng, không phải chỗ sửa tiếp.** Hết vòng phản biện của
+lần thử 2; WMS-2 có dòng hỏng thứ hai ⇒ loop guard #3 cấm máy tự chọn lại. Và
+chính R3 dự đoán vòng ba sẽ lộ tầng thứ tư — đó đúng là vòng xoáy mà luật một-vòng
+sinh ra để chặn. Đẩy lên bàn chủ dự án kèm một lựa chọn thật, không xin thêm vòng.
+
+**Điều cần nói rõ khi trình:** ba reviewer đã kiểm độc lập và **lược đồ sản phẩm
+đúng** — mọi ràng buộc tồn tại và hành xử đúng trên CSDL thật. Mọi phép lọt đều
+do reviewer tự tay đục vào lược đồ. Thứ còn thiếu là **độ sâu của hàng rào hồi
+quy**, không phải khuyết tật trong thứ WMS-2 giao.

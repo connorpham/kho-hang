@@ -36,13 +36,13 @@ so_du_ton_kho_to_hop_khoa NULLS NOT DISTINCT: true
 nhat_ky_thao_tac.nguoi_dung_id: NULLABLE
 ```
 
-## Bằng chứng — 38 test tích hợp (lần 2)
+## Bằng chứng — 51 test tích hợp
 
 ```
 $ npm run test:integration
      [itest] PostgreSQL 17.10 · stockflow_wms
-         Tests  38 passed (38)
-      Duration  199ms (transform 17ms, setup 0ms, collect 28ms, tests 78ms, environment 0ms, prepare 23ms)
+         Tests  51 passed (51)
+      Duration  295ms (transform 29ms, setup 0ms, collect 36ms, tests 101ms, environment 0ms, prepare 34ms)
 ```
 
 ## Lần thử 2 — năm việc R3 đòi, và một lỗi tôi tự tìm ra
