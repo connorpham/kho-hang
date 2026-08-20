@@ -36,7 +36,7 @@ so_du_ton_kho_to_hop_khoa NULLS NOT DISTINCT: true
 nhat_ky_thao_tac.nguoi_dung_id: NULLABLE
 ```
 
-## Bằng chứng — 51 test tích hợp
+## Bằng chứng — 54 test tích hợp
 
 ```
 $ npm run test:integration
@@ -84,6 +84,59 @@ trên một bản nhân bản riêng:
 | `mat_khau_hash` VARCHAR(255) → VARCHAR(60) *(từng lọt)* | 8 đỏ |
 | `mat_khau_hash DROP NOT NULL` | 1 đỏ |
 | đổi `ON DELETE RESTRICT` → `SET NULL` | 1 đỏ |
+
+### Vòng 3 — ảnh chụp ghi ĐỊNH NGHĨA, không chỉ định danh
+
+R3 bác bản trước bằng một phép kiểm không cãi được: áp 9 phép đột biến cùng lúc
+rồi **sinh lại ảnh chụp trên chính CSDL đã hỏng** → *không một byte khác nhau*,
+51/51 xanh. Ảnh chụp ghi TÊN ràng buộc/trigger/index mà không ghi nội dung chúng
+thực thi. Hai phép trong đó phá đúng bất biến chỉ-ghi-thêm mà ticket này dựng.
+
+Nay dùng `pg_get_constraintdef()` · `pg_get_indexdef()` · `pg_get_triggerdef()` +
+`md5(thân hàm trigger)`, thêm `column_default`, thêm mặt **khoá chính** (bản cũ
+loại trừ `indisprimary` hẳn) và mặt **bảng + RLS**. Bảy mặt.
+
+**Chạy lại đúng phép kiểm của R3:** áp 8 đột biến rồi sinh lại ảnh chụp trên CSDL
+hỏng → **khác 15 dòng**, và diff chỉ thẳng vào từng phép:
+
+```
+<  "nguoi_dung.so_lan_sai_lien_tiep int4(32,0) DEFAULT 0"
+>  "nguoi_dung.so_lan_sai_lien_tiep int4(32,0) DEFAULT 5"
+<  "nguoi_dung_kho PRIMARY KEY (nguoi_dung_id, kho_id)"          ← mất hẳn
+<  "CREATE UNIQUE INDEX kho_ma_key ON public.kho USING btree (ma)"
+>  "CREATE UNIQUE INDEX kho_ma_key ON public.kho USING btree (id)"
+<  "… CHECK (((ton_sau - ton_truoc) = so_luong))"
+>  "… CHECK ((((ton_sau - ton_truoc) = so_luong) OR ((loai_chung_tu)::text = 'PhieuKiemKe'::text)))"
+```
+
+**Cả 9 phép R3 nêu nay đều đỏ** (1–2 test mỗi phép), gồm cả cửa hậu trong thân hàm
+trigger và RLS. Trình sinh và phép kiểm **dùng chung một định nghĩa truy vấn**
+(test `import { MAT }`), vì hai bản sao của cùng một truy vấn sẽ trôi khỏi nhau và
+bản trôi là bản không ai chạy.
+
+**Một lỗi tôi tự bắt được ở vòng này, và nó là loại nguy hiểm nhất trong cả
+ticket.** Bản đầu của vòng 3 để `MAT` nằm chung file với mã sinh ở cấp cao nhất,
+nên bộ test `import { MAT }` là **chạy luôn trình sinh** — mỗi lần chạy test, CSDL
+bị kết nối và **chính file fixture đang được kiểm bị ghi đè**. Trên CSDL đã đột
+biến, fixture sẽ tự được viết lại cho khớp đột biến: **một test tự chứng nhận
+chính mình**, không bao giờ đỏ được. Lý do nó vẫn đỏ trong các phép đột biến chỉ
+là may mắn về thứ tự import (JSON được nạp trước khi trình sinh kịp ghi).
+
+Bắt được vì thấy dòng log của trình sinh in ra **giữa output test**, rồi kiểm
+mtime của fixture: nó đổi sau mỗi lần chạy. Sửa: tách `scripts/luoc-do-mat.mjs`
+thành module **thuần**, không một dòng nào ngoài định nghĩa; trình sinh và test
+đều import từ đó. Chứng minh sau khi sửa:
+
+```
+mtime fixture trước / sau khi chạy test:  11:23:18 / 11:23:18   (không đổi)
+thêm một cột lạ vào CSDL rồi chạy test :  1 failed | 53 passed  (ĐỎ, không tự sửa)
+gỡ cột lạ đi rồi chạy lại              :  54 passed (54)
+```
+
+**Phạm vi nói thẳng:** bảy mặt, không hơn. CHƯA canh: GRANT/ACL, collation, quyền
+sở hữu, bước nhảy sequence, event trigger, thân hàm không phải hàm trigger. R3 nêu
+chúng như ứng viên chưa ai đo, và tôi ghi vào chính đầu trình sinh thay vì để
+người đọc tưởng nó toàn diện.
 
 **Cái làm chúng chết không phải mười một bản vá.** Nó là **một** ảnh chụp lược đồ
 (`src/lib/__tests__/luoc-do.snapshot.json`, sinh bằng `scripts/chup-luoc-do.mjs`)

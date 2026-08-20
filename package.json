@@ -14,7 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "gate": "python3 .vteam/scripts/gate.py",
-    "test:integration": "node --env-file-if-exists=.env ./node_modules/.bin/vitest run --config vitest.integration.mts"
+    "test:integration": "node --env-file-if-exists=.env ./node_modules/.bin/vitest run --config vitest.integration.mts",
+    "db:snapshot": "node --env-file-if-exists=.env scripts/chup-luoc-do.mjs"
   },
   "repository": {
     "type": "git",

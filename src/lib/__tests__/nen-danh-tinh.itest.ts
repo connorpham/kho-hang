@@ -10,6 +10,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Client } from 'pg'
 import anhChup from './luoc-do.snapshot.json' with { type: 'json' }
+// Module THUẦN: import trình sinh sẽ chạy trình sinh và ghi đè fixture.
+import { MAT } from '../../../scripts/luoc-do-mat.mjs'
 
 let db: Client
 
@@ -202,55 +204,24 @@ describe('WMS-2 · AC2 — NFR-SEC-03: quét bí mật theo DANH SÁCH CHO PHÉP
   })
 })
 
-describe('WMS-2 · ảnh chụp lược đồ — khẳng định TẬP, không phải danh sách cấm', () => {
-  // Reviewer R3 đo được: các test cũ canh theo từng ĐỐI TƯỢNG được gọi tên, nên
-  // 10/12 khoá ngoại, 3/6 chỉ mục duy nhất, và cả bảng `phien` gỡ được mà 38/38
-  // vẫn xanh. Danh sách cấm không bắt thứ chưa ai gọi tên. Năm khẳng định dưới
-  // đây so lược đồ SỐNG với ảnh chụp đã commit, nên mọi thay đổi — đổi kiểu, mất
-  // cột, xoá bảng, đổi ON DELETE, hạ ENABLE ALWAYS — đều đỏ dù không ai đoán trước.
+describe('WMS-2 · ảnh chụp lược đồ — khẳng định ĐỊNH NGHĨA, không phải định danh', () => {
+  // Truy vấn dùng CHUNG với scripts/chup-luoc-do.mjs (import, không chép lại):
+  // hai bản sao của cùng một truy vấn sẽ trôi khỏi nhau, và bản trôi là bản không
+  // ai chạy. Trình sinh và phép kiểm phải nhìn cùng một thứ theo đúng nghĩa đen.
   //
-  // Đổi lược đồ có chủ ý thì chạy `node --env-file-if-exists=.env
-  // scripts/chup-luoc-do.mjs` và để diff của fixture đi qua review.
-  it.each([
-    ['cột (bảng.cột kiểu, ? = nullable)', 'cot', `
-      SELECT table_name || '.' || column_name || ' ' || udt_name ||
-             coalesce('(' || character_maximum_length || ')', '') ||
-             coalesce('(' || numeric_precision || ',' || numeric_scale || ')', '') ||
-             CASE WHEN is_nullable = 'YES' THEN '?' ELSE '' END AS v
-      FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name <> '_prisma_migrations'
-      ORDER BY table_name, column_name`],
-    ['khoá ngoại (kèm ON DELETE)', 'khoaNgoai', `
-      SELECT conrelid::regclass::text || '.' || a.attname || ' -> ' ||
-             confrelid::regclass::text || ' ' ||
-             CASE confdeltype WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE'
-                  WHEN 'a' THEN 'NO ACTION' WHEN 'n' THEN 'SET NULL'
-                  ELSE confdeltype::text END AS v
-      FROM pg_constraint k
-      JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = k.conkey[1]
-      WHERE contype = 'f' AND connamespace = 'public'::regnamespace ORDER BY 1`],
-    ['chỉ mục duy nhất', 'chiMucDuyNhat', `
-      SELECT indexrelid::regclass::text ||
-             CASE WHEN indnullsnotdistinct THEN ' NULLS NOT DISTINCT' ELSE '' END AS v
-      FROM pg_index WHERE indisunique AND NOT indisprimary
-        AND indrelid IN (SELECT oid FROM pg_class WHERE relnamespace = 'public'::regnamespace)
-      ORDER BY 1`],
-    ['ràng buộc CHECK', 'rangBuocCheck', `
-      SELECT conname AS v FROM pg_constraint
-      WHERE contype = 'c' AND connamespace = 'public'::regnamespace ORDER BY 1`],
-    ['trigger (kèm chế độ ALWAYS/ORIGIN)', 'trigger', `
-      SELECT c.relname || '.' || t.tgname || ' ' ||
-             CASE t.tgenabled WHEN 'A' THEN 'ALWAYS' WHEN 'O' THEN 'ORIGIN'
-                  WHEN 'D' THEN 'DISABLED' ELSE t.tgenabled::text END AS v
-      FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
-      WHERE NOT t.tgisinternal AND c.relnamespace = 'public'::regnamespace ORDER BY 1`],
-  ])('tập %s khớp ảnh chụp đã commit', async (_ten, khoa, sql) => {
-    const { rows } = await db.query(sql)
-    // `ghiChu` là chuỗi, các khoá còn lại là mảng — ép thẳng sang
-    // Record<string, string[]> là nói dối kiểu, và tsc bắt đúng. Lấy đúng mảng.
+  // Vòng review trước: ảnh chụp ghi TÊN ràng buộc/trigger/index mà không ghi định
+  // nghĩa, nên R3 dựng lại chúng cùng tên với nội dung khác và ảnh chụp không đổi
+  // một byte. Nay ghi pg_get_*def() + md5 thân hàm trigger.
+  it.each(Object.entries(MAT))('tập %s khớp ảnh chụp đã commit', async (khoa, sql) => {
+    const { rows } = await db.query(sql as string)
     const mong = (anhChup as unknown as Record<string, unknown>)[khoa]
     expect(Array.isArray(mong)).toBe(true)
     expect(rows.map((r) => r.v)).toEqual(mong)
+  })
+
+  it('ảnh chụp phải phủ ĐÚNG bảy mặt — thêm mặt mới thì phải cập nhật fixture', () => {
+    expect(Object.keys(MAT).sort()).toEqual(
+      ['bang', 'chiMucDuyNhat', 'cot', 'khoaChinh', 'khoaNgoai', 'rangBuocCheck', 'trigger'])
   })
 })
 

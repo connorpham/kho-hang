@@ -1,74 +1,35 @@
-// Sinh src/lib/__tests__/luoc-do.snapshot.json — ảnh chụp cấu trúc CSDL.
+// Sinh src/lib/__tests__/luoc-do.snapshot.json — ảnh chụp ĐỊNH NGHĨA của lược đồ.
 //
-// Vì sao tồn tại: reviewer R3 đo được rằng các test cũ canh theo TỪNG ĐỐI TƯỢNG
-// được gọi tên, nên 10/12 khoá ngoại, 3/6 chỉ mục unique, và cả bảng `phien` gỡ
-// được mà 38/38 vẫn xanh. Danh sách cấm không bắt được thứ chưa ai gọi tên; ảnh
-// chụp tập thì bắt.
+// LẦN VIẾT THỨ HAI. Bản đầu ghi ĐỊNH DANH (tên ràng buộc, tên trigger, tên index)
+// mà không ghi ĐỊNH NGHĨA. Reviewer R3 áp 9 phép đột biến cùng lúc rồi chạy lại
+// chính script này trên CSDL đã hỏng: KHÔNG MỘT BYTE KHÁC NHAU, 51/51 xanh. Hai
+// phép trong đó phá đúng bất biến chỉ-ghi-thêm mà WMS-2 sinh ra để dựng — thay
+// thân hàm trigger bằng bản có cửa hậu, và dựng lại CHECK giữ nguyên tên nhưng
+// nới biểu thức.
 //
-//   node --env-file-if-exists=.env scripts/chup-luoc-do.mjs
+// Nay dùng pg_get_constraintdef / pg_get_indexdef / pg_get_triggerdef + md5 thân
+// hàm, và thêm mặt khoá chính (bản cũ loại trừ indisprimary hẳn).
 //
-// Chạy lại SAU KHI cố ý đổi lược đồ, và diff của fixture phải đi qua review.
+//   npm run db:snapshot
+//
+// Chạy lại SAU KHI cố ý đổi lược đồ; diff của fixture phải đi qua review.
+//
+// Phạm vi thành thật: BẢY mặt dưới đây, không hơn. Những thứ CHƯA được ghi và do
+// đó KHÔNG được canh: GRANT/ACL, collation, quyền sở hữu, bước nhảy sequence,
+// event trigger, và nội dung thân hàm KHÔNG phải hàm trigger. R3 nêu chúng như
+// ứng viên chưa ai đo — đừng đọc file này như một bảo đảm toàn diện.
 import { Client } from 'pg'
 import { writeFileSync } from 'node:fs'
+import { MAT } from './luoc-do-mat.mjs'
 
 const c = new Client({ connectionString: process.env.DATABASE_URL })
 await c.connect()
-const q = async (s) => (await c.query(s)).rows
-
-const cot = await q(`
-  SELECT table_name || '.' || column_name || ' ' || udt_name ||
-         -- Độ dài PHẢI nằm trong ảnh chụp: udt_name của varchar(255) và
-         -- varchar(60) giống hệt nhau, mà băm argon2id thật dài ~97 ký tự nên
-         -- thu cột xuống 60 là chặt cụt băm. R3 chỉ ra lỗ này.
-         coalesce('(' || character_maximum_length || ')', '') ||
-         coalesce('(' || numeric_precision || ',' || numeric_scale || ')', '') ||
-         CASE WHEN is_nullable = 'YES' THEN '?' ELSE '' END AS v
-  FROM information_schema.columns
-  WHERE table_schema = 'public' AND table_name <> '_prisma_migrations'
-  ORDER BY table_name, column_name`)
-
-const khoaNgoai = await q(`
-  SELECT conrelid::regclass::text || '.' || a.attname || ' -> ' ||
-         confrelid::regclass::text || ' ' ||
-         CASE confdeltype WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE'
-              WHEN 'a' THEN 'NO ACTION' WHEN 'n' THEN 'SET NULL'
-              ELSE confdeltype::text END AS v
-  FROM pg_constraint k
-  JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = k.conkey[1]
-  WHERE contype = 'f' AND connamespace = 'public'::regnamespace
-  ORDER BY 1`)
-
-const duyNhat = await q(`
-  SELECT indexrelid::regclass::text ||
-         CASE WHEN indnullsnotdistinct THEN ' NULLS NOT DISTINCT' ELSE '' END AS v
-  FROM pg_index
-  WHERE indisunique AND NOT indisprimary
-    AND indrelid IN (SELECT oid FROM pg_class WHERE relnamespace = 'public'::regnamespace)
-  ORDER BY 1`)
-
-const rangBuoc = await q(`
-  SELECT conname AS v FROM pg_constraint
-  WHERE contype = 'c' AND connamespace = 'public'::regnamespace ORDER BY 1`)
-
-const trigger = await q(`
-  SELECT c.relname || '.' || t.tgname || ' ' ||
-         CASE t.tgenabled WHEN 'A' THEN 'ALWAYS' WHEN 'O' THEN 'ORIGIN'
-              WHEN 'D' THEN 'DISABLED' ELSE t.tgenabled::text END AS v
-  FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
-  WHERE NOT t.tgisinternal AND c.relnamespace = 'public'::regnamespace
-  ORDER BY 1`)
-
-const anh = {
-  ghiChu: 'Ảnh chụp lược đồ. Sinh bằng scripts/chup-luoc-do.mjs. Mọi thay đổi ở '
-        + 'đây phải là CỐ Ý và phải đi qua review — đó là toàn bộ mục đích của nó.',
-  cot: cot.map((r) => r.v),
-  khoaNgoai: khoaNgoai.map((r) => r.v),
-  chiMucDuyNhat: duyNhat.map((r) => r.v),
-  rangBuocCheck: rangBuoc.map((r) => r.v),
-  trigger: trigger.map((r) => r.v),
+const anh = { ghiChu: 'Ảnh chụp ĐỊNH NGHĨA lược đồ. Sinh bằng npm run db:snapshot. '
+  + 'Mọi thay đổi ở đây phải là CỐ Ý và phải đi qua review.' }
+for (const [khoa, sql] of Object.entries(MAT)) {
+  anh[khoa] = (await c.query(sql)).rows.map((r) => r.v)
 }
 writeFileSync('src/lib/__tests__/luoc-do.snapshot.json', JSON.stringify(anh, null, 2) + '\n')
-console.log(`ảnh chụp: ${anh.cot.length} cột · ${anh.khoaNgoai.length} khoá ngoại · `
-  + `${anh.chiMucDuyNhat.length} chỉ mục duy nhất · ${anh.rangBuocCheck.length} CHECK · `
-  + `${anh.trigger.length} trigger`)
+console.log(Object.entries(anh).filter(([k]) => k !== 'ghiChu')
+  .map(([k, v]) => `${k}=${v.length}`).join(' · '))
 await c.end()
