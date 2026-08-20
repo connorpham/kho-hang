@@ -63,10 +63,37 @@ vẫn xanh. Sửa theo lớp: **khẳng định TÊN ràng buộc** ở 12 chỗ
 Một lỗi thứ hai lộ ra cùng lúc: câu DELETE dùng CTE ghi dữ liệu **không thấy dòng
 CTE vừa chèn** (cùng ảnh chụp), nên nó xoá 0 dòng và test xanh vô nghĩa.
 
-Đột biến sau khi sửa: gỡ FK `kho_id` → 1 đỏ · gỡ FK `nguoi_thuc_hien_id` → 2 đỏ ·
-gỡ CHECK tồn-không-âm → 6 đỏ · gỡ CHECK băm → 1 đỏ · hạ `ENABLE ALWAYS` → 3 đỏ ·
-đảo một cột về `timestamp` → 1 đỏ · gỡ unique tên đăng nhập → 1 đỏ · đổi tên 8 vai
-trò → 1 đỏ · `SC-xx` → `RAC-xx` → 1 đỏ. **Không phép nào còn lọt.**
+### Bảng đột biến — số thật, không tổng kết tuyệt đối
+
+Bản trước của mục này viết *"Không phép nào còn lọt"* và liệt kê **2 trong 3**
+khoá ngoại của phép đột biến gốc — cái bị bỏ ra (`so_du_ton_kho_kho_id_fkey`)
+chính là cái còn lọt. R3 bắt được (CHẶN-1b). **Lần thứ năm tôi khẳng định một
+điều về công việc của mình mà không kiểm lại.** Số dưới đây là đo thật, từng phép
+trên một bản nhân bản riêng:
+
+| Phép đột biến | Kết quả |
+|---|---|
+| gỡ `so_du_ton_kho_kho_id_fkey` *(từng lọt)* | 1 đỏ |
+| gỡ `phien_nguoi_dung_id_fkey` *(từng lọt)* | 1 đỏ |
+| gỡ unique `kho_ma_key` *(từng lọt)* | 1 đỏ |
+| gỡ unique `quyen_man_hinh_hanh_dong_key` *(từng lọt)* | 1 đỏ |
+| `DROP TABLE phien CASCADE` *(từng lọt)* | 2 đỏ |
+| `phien.het_han_luc` → `text` *(từng lọt)* | 1 đỏ |
+| nới CHECK băm thành `~ '^\$'` *(từng lọt)* | 3 đỏ |
+| hạ `ENABLE ALWAYS` **chỉ** trên 2 trigger TRUNCATE *(từng lọt)* | 3 đỏ |
+| `mat_khau_hash` VARCHAR(255) → VARCHAR(60) *(từng lọt)* | 8 đỏ |
+| `mat_khau_hash DROP NOT NULL` | 1 đỏ |
+| đổi `ON DELETE RESTRICT` → `SET NULL` | 1 đỏ |
+
+**Cái làm chúng chết không phải mười một bản vá.** Nó là **một** ảnh chụp lược đồ
+(`src/lib/__tests__/luoc-do.snapshot.json`, sinh bằng `scripts/chup-luoc-do.mjs`)
+khẳng định **TẬP** cột/khoá ngoại/chỉ mục/CHECK/trigger thay vì danh sách cấm.
+R3 nói đúng: danh sách cấm không bắt được thứ chưa ai gọi tên. Ba phép cuối trong
+bảng chưa ai từng nêu — chúng chết vì tính chất, không vì bị đoán trúng.
+
+Hai phép cần cả bản vá thứ hai: `VARCHAR(60)` chỉ chết sau khi ảnh chụp ghi thêm
+**độ dài cột** (`udt_name` của `varchar(255)` và `varchar(60)` giống hệt nhau) và
+fixture đổi sang băm argon2id **dài thật 98 ký tự** thay vì chuỗi giả 45 ký tự.
 
 ## Vòng review 3 người tìm ra 12 finding chặn — tóm tắt cái nặng nhất
 
@@ -129,6 +156,21 @@ vòng đầu chạy nhầm server**, không phải server mà SRS §2.3 yêu c�
 tìm ra bằng `lsof`. Đã dừng Homebrew, chạy lại tất cả trên container, và
 `db-check.sh` nay in tên server + database + max_connections thay vì chỉ
 "reachable". Ghi thành [KI-003](../../docs/qa/known-issues.md) và cảnh báo trong README.
+
+## Một lỗ bảo mật do CHÍNH bản sửa này tạo ra — chưa vá, và nói rõ vì sao
+
+Reviewer R2 chỉ ra: ràng buộc chống lưu mật khẩu rõ **lại in mật khẩu rõ ra log**.
+Vi phạm CHECK trả `DETAIL: Failing row contains (8, z, z@x, Z, SieuBiMat!2026, …)`,
+kể cả với truy vấn tham số hoá; dòng đó vào log server, và `e.detail` của driver
+`pg` vào log ứng dụng. **NFR-SEC-09 cấm ghi mật khẩu vào tệp nhật ký.**
+
+**Chưa vá, và đây là lý do** — không phải vì rẻ hơn: lỗ này **không** chỉ ở CHECK
+của tôi. Mọi vi phạm ràng buộc trên `nguoi_dung` đều in cả dòng, gồm cột băm; một
+INSERT trùng tên đăng nhập cũng in. Đổi riêng CHECK này thành trigger sẽ bịt đúng
+một đường trong nhiều đường và **tạo cảm giác đã xong**. Chỗ sửa thật nằm ở tầng
+ứng dụng (không log `e.detail` cho bảng này) và ở cấu hình triển khai
+(`log_error_verbosity = terse`) — cả hai thuộc WMS-3 và phụ thuộc OPN-03. Đã ghi
+thành ràng buộc thiết kế cho WMS-3 trong `docs/pm/decisions.md`.
 
 ## Giới hạn còn lại
 

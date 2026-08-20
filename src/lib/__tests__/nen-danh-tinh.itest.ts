@@ -9,6 +9,7 @@
 // Bản này kiểm hành vi: làm thật rồi xem CSDL có chặn không.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Client } from 'pg'
+import anhChup from './luoc-do.snapshot.json' with { type: 'json' }
 
 let db: Client
 
@@ -101,7 +102,7 @@ describe('WMS-2 · AC1 — NguoiDung n–n VaiTro và n–n Kho (kiểm HÀNH VI
   it('một người dùng nhận được NHIỀU vai trò', async () => {
     const ma = await thu(`
       WITH n AS (INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
-                 VALUES ('nn1','nn1@x','N','$argon2id$v=19$m=65536,t=3,p=4$Z2lhbGFw$gia-lap') RETURNING id)
+                 VALUES ('nn1','nn1@x','N','$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEyMzQ$k9F2mQ7xPzLwR3sT8vN1bY6cH0aJ4eD5gU2iO7pK9lM') RETURNING id)
       INSERT INTO nguoi_dung_vai_tro (nguoi_dung_id, vai_tro_id)
       SELECT n.id, v.id FROM n CROSS JOIN vai_tro v WHERE v.ma IN ('QLK','TK')`)
     expect(ma).toBeNull()
@@ -110,7 +111,7 @@ describe('WMS-2 · AC1 — NguoiDung n–n VaiTro và n–n Kho (kiểm HÀNH VI
   it('một vai trò gắn được cho NHIỀU người dùng', async () => {
     const ma = await thu(`
       WITH n AS (INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
-                 VALUES ('nn2','nn2@x','N','$argon2id$v=19$m=65536,t=3,p=4$Z2lhbGFw$gia-lap'), ('nn3','nn3@x','N','$argon2id$v=19$m=65536,t=3,p=4$Z2lhbGFw$gia-lap') RETURNING id)
+                 VALUES ('nn2','nn2@x','N','$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEyMzQ$k9F2mQ7xPzLwR3sT8vN1bY6cH0aJ4eD5gU2iO7pK9lM'), ('nn3','nn3@x','N','$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEyMzQ$k9F2mQ7xPzLwR3sT8vN1bY6cH0aJ4eD5gU2iO7pK9lM') RETURNING id)
       INSERT INTO nguoi_dung_vai_tro (nguoi_dung_id, vai_tro_id)
       SELECT n.id, v.id FROM n CROSS JOIN vai_tro v WHERE v.ma = 'QLK'`)
     expect(ma).toBeNull()
@@ -119,7 +120,7 @@ describe('WMS-2 · AC1 — NguoiDung n–n VaiTro và n–n Kho (kiểm HÀNH VI
   it('cặp (người dùng, vai trò) TRÙNG bị chặn — cặp biên của n–n', async () => {
     const ma = await thu(`
       WITH n AS (INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
-                 VALUES ('nn4','nn4@x','N','$argon2id$v=19$m=65536,t=3,p=4$Z2lhbGFw$gia-lap') RETURNING id)
+                 VALUES ('nn4','nn4@x','N','$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEyMzQ$k9F2mQ7xPzLwR3sT8vN1bY6cH0aJ4eD5gU2iO7pK9lM') RETURNING id)
       INSERT INTO nguoi_dung_vai_tro (nguoi_dung_id, vai_tro_id)
       SELECT n.id, v.id FROM n CROSS JOIN vai_tro v WHERE v.ma = 'QLK'
       UNION ALL SELECT n.id, v.id FROM n CROSS JOIN vai_tro v WHERE v.ma = 'QLK'`)
@@ -130,7 +131,7 @@ describe('WMS-2 · AC1 — NguoiDung n–n VaiTro và n–n Kho (kiểm HÀNH VI
     const ma = await thu(`
       WITH k AS (INSERT INTO kho (ma, ten) VALUES ('K1','Kho 1'), ('K2','Kho 2') RETURNING id),
            n AS (INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
-                 VALUES ('nn5','nn5@x','N','$argon2id$v=19$m=65536,t=3,p=4$Z2lhbGFw$gia-lap') RETURNING id)
+                 VALUES ('nn5','nn5@x','N','$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEyMzQ$k9F2mQ7xPzLwR3sT8vN1bY6cH0aJ4eD5gU2iO7pK9lM') RETURNING id)
       INSERT INTO nguoi_dung_kho (nguoi_dung_id, kho_id) SELECT n.id, k.id FROM n CROSS JOIN k`)
     expect(ma).toBeNull()
   })
@@ -154,6 +155,22 @@ describe('WMS-2 · AC2 — NFR-SEC-03: quét bí mật theo DANH SÁCH CHO PHÉP
 
   // R3 đục thủng bản trước bằng cách nhét chuỗi RÕ vào chính mat_khau_hash: quét
   // tên cột không nói gì về nội dung. Nay CSDL từ chối thứ không phải chuỗi băm.
+  // R2 làm yếu CHECK xuống `~ '\\$'` (chỉ cần CHỨA `$`) và 38/38 vẫn xanh, vì mẫu
+  // âm duy nhất là 'MatKhau@123' — không có ký tự `$`. Mẫu âm phải bao gồm chuỗi
+  // CÓ `$`, nếu không test không phân biệt nổi ràng buộc thật với ràng buộc rỗng.
+  it.each([
+    ['mật khẩu rõ', 'MatKhau@123'],
+    ['mật khẩu rõ CÓ ký tự $', 'Mat$Khau@123'],
+    ['mật khẩu rõ bắt đầu bằng $', '$SieuBiMat2026'],
+    ['thuật toán ngoài ba họ NFR-SEC-03', '$pbkdf2-sha256$29000$salt$hash'],
+    ['mã hoá hai chiều — NFR-SEC-03 cấm đích danh', '$aes256$iv$ciphertext'],
+    ['chuỗi rỗng', ''],
+  ])('%s bị CSDL từ chối', async (_ten, gt) => {
+    expect(await thuRB(
+      `INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
+       VALUES ('am','am@x','Am',$1)`, [gt])).toBe('23514:nguoi_dung_mat_khau_phai_la_bam')
+  })
+
   it('mật khẩu dạng RÕ bị CSDL từ chối', async () => {
     expect(await thu(
       `INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
@@ -167,7 +184,7 @@ describe('WMS-2 · AC2 — NFR-SEC-03: quét bí mật theo DANH SÁCH CHO PHÉP
   it.each([
     ['bcrypt', '$2b$12$abcdefghijklmnopqrstuv'],
     ['scrypt', '$scrypt$ln=16,r=8,p=1$c2FsdA$aGFzaA'],
-    ['argon2id', '$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA'],
+    ['argon2id', '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEyMzQ$k9F2mQ7xPzLwR3sT8vN1bY6cH0aJ4eD5gU2iO7pK9lM'],
   ])('băm %s hợp lệ thì đi qua — cặp biên, và NFR-SEC-03 cho phép cả ba', async (_ten, bam) => {
     expect(await thu(
       `INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
@@ -175,13 +192,61 @@ describe('WMS-2 · AC2 — NFR-SEC-03: quét bí mật theo DANH SÁCH CHO PHÉP
   })
 
   it('tên đăng nhập và email phải DUY NHẤT — FR-01-01 đăng nhập bằng một trong hai', async () => {
-    const bam = '$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA'
+    const bam = '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEyMzQ$k9F2mQ7xPzLwR3sT8vN1bY6cH0aJ4eD5gU2iO7pK9lM'
     expect(await thu(
       `INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
        VALUES ('trung','a@x','A',$1), ('trung','b@x','B',$1)`, [bam])).toBe('23505')
     expect(await thu(
       `INSERT INTO nguoi_dung (ten_dang_nhap, email, ho_ten, mat_khau_hash)
        VALUES ('a','trung@x','A',$1), ('b','trung@x','B',$1)`, [bam])).toBe('23505')
+  })
+})
+
+describe('WMS-2 · ảnh chụp lược đồ — khẳng định TẬP, không phải danh sách cấm', () => {
+  // Reviewer R3 đo được: các test cũ canh theo từng ĐỐI TƯỢNG được gọi tên, nên
+  // 10/12 khoá ngoại, 3/6 chỉ mục duy nhất, và cả bảng `phien` gỡ được mà 38/38
+  // vẫn xanh. Danh sách cấm không bắt thứ chưa ai gọi tên. Năm khẳng định dưới
+  // đây so lược đồ SỐNG với ảnh chụp đã commit, nên mọi thay đổi — đổi kiểu, mất
+  // cột, xoá bảng, đổi ON DELETE, hạ ENABLE ALWAYS — đều đỏ dù không ai đoán trước.
+  //
+  // Đổi lược đồ có chủ ý thì chạy `node --env-file-if-exists=.env
+  // scripts/chup-luoc-do.mjs` và để diff của fixture đi qua review.
+  it.each([
+    ['cột (bảng.cột kiểu, ? = nullable)', 'cot', `
+      SELECT table_name || '.' || column_name || ' ' || udt_name ||
+             coalesce('(' || character_maximum_length || ')', '') ||
+             coalesce('(' || numeric_precision || ',' || numeric_scale || ')', '') ||
+             CASE WHEN is_nullable = 'YES' THEN '?' ELSE '' END AS v
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name <> '_prisma_migrations'
+      ORDER BY table_name, column_name`],
+    ['khoá ngoại (kèm ON DELETE)', 'khoaNgoai', `
+      SELECT conrelid::regclass::text || '.' || a.attname || ' -> ' ||
+             confrelid::regclass::text || ' ' ||
+             CASE confdeltype WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE'
+                  WHEN 'a' THEN 'NO ACTION' WHEN 'n' THEN 'SET NULL'
+                  ELSE confdeltype::text END AS v
+      FROM pg_constraint k
+      JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = k.conkey[1]
+      WHERE contype = 'f' AND connamespace = 'public'::regnamespace ORDER BY 1`],
+    ['chỉ mục duy nhất', 'chiMucDuyNhat', `
+      SELECT indexrelid::regclass::text ||
+             CASE WHEN indnullsnotdistinct THEN ' NULLS NOT DISTINCT' ELSE '' END AS v
+      FROM pg_index WHERE indisunique AND NOT indisprimary
+        AND indrelid IN (SELECT oid FROM pg_class WHERE relnamespace = 'public'::regnamespace)
+      ORDER BY 1`],
+    ['ràng buộc CHECK', 'rangBuocCheck', `
+      SELECT conname AS v FROM pg_constraint
+      WHERE contype = 'c' AND connamespace = 'public'::regnamespace ORDER BY 1`],
+    ['trigger (kèm chế độ ALWAYS/ORIGIN)', 'trigger', `
+      SELECT c.relname || '.' || t.tgname || ' ' ||
+             CASE t.tgenabled WHEN 'A' THEN 'ALWAYS' WHEN 'O' THEN 'ORIGIN'
+                  WHEN 'D' THEN 'DISABLED' ELSE t.tgenabled::text END AS v
+      FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+      WHERE NOT t.tgisinternal AND c.relnamespace = 'public'::regnamespace ORDER BY 1`],
+  ])('tập %s khớp ảnh chụp đã commit', async (_ten, khoa, sql) => {
+    const { rows } = await db.query(sql)
+    expect(rows.map((r) => r.v)).toEqual((anhChup as Record<string, string[]>)[khoa])
   })
 })
 
@@ -200,7 +265,7 @@ describe('WMS-2 · DC-06 — mọi cột thời gian phải mang múi giờ', ()
 })
 
 describe('WMS-2 · SRS §5.2 — khoá ngoại tới Kho và NguoiDung phải thực thi', () => {
-  const BAM = '$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA'
+  const BAM = '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHR2YWx1ZTEyMzQ$k9F2mQ7xPzLwR3sT8vN1bY6cH0aJ4eD5gU2iO7pK9lM'
 
   it('kho_id không tồn tại bị chặn bởi ĐÚNG khoá ngoại kho', async () => {
     // Người dùng có thật, chỉ kho là giả ⇒ chỉ một khoá ngoại có thể bắt.
@@ -334,13 +399,20 @@ describe('WMS-2 · AC4 — BRULE-13 / DI-07: chỉ ghi thêm', () => {
   // đường tấn công ĐÃ BIẾT, mà không một test nào canh. Bỏ ALWAYS thì bộ test cũ
   // vẫn 27/27 trong khi nhật ký xoá sạch được. R2 còn chỉ ra chu trình
   // DISABLE TRIGGER ALL → ENABLE TRIGGER ALL hạ ALWAYS xuống ORIGIN mà không báo gì.
-  it.each(['nhat_ky_thao_tac', 'chuyen_dong_kho'])(
-    'session_replication_role=replica KHÔNG tắt được chốt của %s', async (bang) => {
-      expect(await voiDuLieuMoi(async () => {
-        await db.query(`SET LOCAL session_replication_role = 'replica'`)
-        return thuTrong(`DELETE FROM ${bang}`)
-      })).toBe('23001')
-    })
+  // Tích HAI CHIỀU: hai bảng × hai thao tác. Bản trước chỉ canh DELETE, nên hạ
+  // ENABLE ALWAYS riêng trên hai trigger TRUNCATE thì 38/38 xanh và
+  // `replica; TRUNCATE` xoá sạch nhật ký kiểm toán — R2 đã làm thật.
+  it.each([
+    ['nhat_ky_thao_tac', 'DELETE FROM nhat_ky_thao_tac'],
+    ['nhat_ky_thao_tac', 'TRUNCATE nhat_ky_thao_tac CASCADE'],
+    ['chuyen_dong_kho', 'DELETE FROM chuyen_dong_kho'],
+    ['chuyen_dong_kho', 'TRUNCATE chuyen_dong_kho CASCADE'],
+  ])('replica KHÔNG tắt được chốt của %s (%s)', async (_bang, cau) => {
+    expect(await voiDuLieuMoi(async () => {
+      await db.query(`SET LOCAL session_replication_role = 'replica'`)
+      return thuTrong(cau)
+    })).toBe('23001')
+  })
 
   it('INSERT thì KHÔNG bị chặn — cặp biên của "chỉ ghi thêm"', async () => {
     // voiDuLieuMoi tự INSERT vào cả hai bảng; tới được đây nghĩa là INSERT chạy.
