@@ -4,9 +4,12 @@
 - **Ngày:** 19/08/2026
 - **Bối cảnh tài liệu:** SRS §2.3, §4.1 (FR-01-06, FR-01-07), §7.1 (NFR-PER-02,
   NFR-PER-05), §7.3 (NFR-SEC-01, NFR-SEC-04, NFR-SEC-08); SRD BR-22; ADR-0001
-- **Luật ghi chép:** theo quyết định Q3/Q4, tài liệu này **tham chiếu bằng MÃ
-  yêu cầu** và chỉ nêu tham số kỹ thuật cần cho quyết định — không chép nguyên
-  văn câu yêu cầu nào. (Bản thân việc `docs/adr/` vẫn nằm trong repo public là
+- **Luật ghi chép — nói cho đúng thứ tài liệu này thật sự làm:** nó tham chiếu
+  bằng MÃ yêu cầu và **có tóm tắt nội dung yêu cầu ở mức đủ để hiểu quyết định**
+  (bảng §Bối cảnh), chứ không chép nguyên văn câu nào từ SRS. Nói "chỉ tham chiếu
+  bằng mã" là mô tả sai chính nó: một ADR không nêu được lực kéo thì vô dụng.
+  G-05 (2026-08-19) đã cân nhắc đúng điều này khi cho phép giữ `docs/adr/` trong
+  repo public. (Bản thân việc `docs/adr/` vẫn nằm trong repo public là
   một lựa chọn chưa được hỏi lại — xem §Câu hỏi còn treo.)
 
 ## Bối cảnh — các lực kéo ngược nhau
