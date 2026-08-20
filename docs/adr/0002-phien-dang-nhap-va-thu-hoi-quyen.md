@@ -1,6 +1,11 @@
 # ADR-0002 — Phiên đăng nhập lưu phía máy chủ, thu hồi quyền tức thời
 
-- **Trạng thái:** **Proposed** — chấp nhận là quyền của chủ dự án (buổi rà soát)
+- **Trạng thái:** **ACCEPTED 2026-08-20** — chủ dự án chấp nhận qua quyết định A6,
+  sau khi WMS-1 cho con số kiểm chứng được độc lập: p95 gộp **5,2031 ms** trên
+  14.000 request, **0 request vượt trần 50 ms** (bằng chứng: `evd/WMS-1/`).
+  Điều kiện của §Sửa đổi 2 đã thoả. Quyết định tạm về kích thước pool (**20 mỗi
+  bản sao, tối đa 3 bản sao**) trở thành ràng buộc mà WMS-2 phải đặt tường minh.
+  Hai ẩn số còn lại — `max_connections` và số bản sao thật — vẫn chờ **OPN-03**.
 - **Ngày:** 19/08/2026
 - **Bối cảnh tài liệu:** SRS §2.3, §4.1 (FR-01-06, FR-01-07), §7.1 (NFR-PER-02,
   NFR-PER-05), §7.3 (NFR-SEC-01, NFR-SEC-04, NFR-SEC-08); SRD BR-22; ADR-0001
@@ -134,3 +139,123 @@ một phép đo nào. Nếu một điều bị lật, khả năng cao nhất là
   tham số kiến trúc (thời hạn phiên, cận thu hồi) để có nghĩa. Đây là rò rỉ nhẹ
   hơn shard nhiều, nhưng vẫn là rò rỉ, và nó sẽ lặp lại ở mọi ADR sau. Chưa hỏi.
 - OPN-03 quyết xong thì mục "dọn phiên hết hạn" mới chốt được.
+
+
+---
+
+# Sửa đổi 1 — 2026-08-19: trần 50 ms GỒM chi phí lấy kết nối
+
+## Vì sao phải sửa
+
+WMS-1 đo xong thì lộ ra rằng bản gốc của ADR này viết điều kiện mập mờ: *"mỗi
+request cộng thêm một lượt đi CSDL … nếu nó ăn quá 10% ngân sách 500 ms"*. Không
+nói rõ "lượt đi" có gồm chi phí **lấy kết nối từ pool** hay không.
+
+Sự mập mờ đó không vô hại. Báo cáo WMS-1 vòng 2 tách chờ pool ra khỏi phán quyết
+và kết luận ĐẠT; reviewer R1 chỉ ra rằng **chính việc tách đó** giữ phán quyết ở
+ĐẠT, và đo được **riêng chờ pool p95 vượt trần 50 ms ở 2/6 lần chạy** (160 ms và
+57 ms). Chủ dự án đã quyết (A4, `docs/pm/decisions.md`):
+
+> **Trần 50 ms áp cho TOÀN BỘ chi phí mà một request phải trả thêm, tính từ lúc
+> xin kết nối tới lúc có dữ liệu phiên. Người dùng có chờ lấy kết nối, nên nó là
+> chi phí thật.**
+
+## Ba hệ quả
+
+**1. WMS-1 TRƯỢT theo cách đọc đúng và phải đo lại.** Phép đo phải ghi **cặp giá
+trị theo từng lượt** (chờ + truy vấn) rồi báo p95 của TỔNG — bản hiện tại chỉ lưu
+hai mảng rời nên p95 của tổng không khôi phục được từ bằng chứng.
+
+**2. Kích thước pool không còn là tham số vận hành.** Nó quyết định trực tiếp
+việc một yêu cầu ưu tiên M có đạt hay không, nên nó là **quyết định kiến trúc**
+và phải chốt TRƯỚC khi WMS-2 dựng lược đồ.
+
+**3. Quy tắc chọn pool — không phải một con số ma thuật.** SRS §2.3 chạy **nhiều
+bản sao sau load balancer**, nên ràng buộc thật là ràng buộc TỔNG:
+
+> `số bản sao × kích thước pool + dự phòng quản trị ≤ max_connections`
+
+Container hiện tại có `max_connections = 100`. R1 đã chứng minh mặt trái khi coi
+thường ràng buộc này: đặt pool = 100 thì `Promise.all` các `connect()` bị từ chối
+một phần, client đã lấy không bao giờ được release, `pool.end()` không bao giờ
+resolve — **tiến trình treo vô hạn và chiếm hết kết nối, cả máy không ai vào được
+CSDL dev nữa**. Một cấu hình sai ở đây không làm hệ thống chậm, nó làm hệ thống
+chết.
+
+## Quyết định tạm về kích thước pool
+
+🟡 **PROVISIONAL 2026-08-19 — pending acceptance.** Máy đặt tạm **pool = 20 cho
+mỗi bản sao, tối đa 3 bản sao** (60 kết nối + 40 dự phòng trên `max_connections`
+100). Cơ sở: đây là cấu hình mà WMS-1 đã đo thật, không phải con số nghĩ ra.
+
+**Điều kiện xác nhận:** WMS-1 (đo lại) phải cho **p95 của TỔNG chờ + truy vấn ≤
+50 ms** ở cấu hình này, đo qua nhiều lần lặp và lấy lần xấu nhất. Không đạt thì
+hoặc tăng `max_connections` (phụ thuộc **OPN-03**, vì hạ tầng quyết định con số
+đó), hoặc giảm số bản sao, hoặc quay lại PA-4 (Redis) — và khi đó Redis không còn
+là "thêm hạ tầng cho vui" mà là cách duy nhất đạt yêu cầu.
+
+**Vì sao đây chỉ là tạm:** `max_connections = 100` là **mặc định của image
+`postgres:17-alpine`**, chưa phải cấu hình đã chốt của môi trường chạy thật — mà
+môi trường chạy thật còn chờ OPN-03. Con số bản sao cũng chưa ai quyết. Hai ẩn số
+đó đóng lại thì quy tắc ở trên mới ra được một con số cuối cùng.
+
+## Cập nhật mục Hệ quả tiêu cực của bản gốc
+
+Gạch đầu dòng *"Mỗi request cộng thêm một lượt đi CSDL"* nay đọc là: **chi phí đó
+gồm cả thời gian chờ lấy kết nối**, và ở tải 200 người đồng thời thì **thời gian
+chờ pool là thành phần LỚN HƠN chi phí truy vấn vài lần** (WMS-1 đo: truy vấn p95
+~2 ms, chờ pool p95 10–18 ms ở lần chạy bình thường). Tối ưu truy vấn không giải
+quyết được gì; chỉnh pool mới giải quyết.
+
+
+---
+
+# Sửa đổi 2 — 2026-08-19: điều kiện phải PHỦ ĐỊNH ĐƯỢC
+
+## Vì sao phải sửa tiếp
+
+Sửa đổi 1 viết điều kiện xác nhận là *"p95 của TỔNG ≤ 50 ms, đo qua nhiều lần lặp
+và **lấy lần xấu nhất**"*. Reviewer R1 chỉ ra điều kiện đó **hỏng từ gốc**, và
+chứng minh bằng cách đổi đúng một hằng số trong harness — `SO_LAN_LAP` từ 7 lên
+60, không sửa một dòng code nào:
+
+```
+TỔNG p95 tại pool 20: 81.145 ms / trần 50 ms  ->  ADR-0002 TRƯỢT   EXIT=1
+```
+
+Lý do: **kỳ vọng của một giá trị lớn nhất tăng đơn điệu theo số lần lấy mẫu.**
+Một tiêu chí dựa trên `max` không đo hệ thống, nó đo *người ta nhìn bao lâu*. Gộp
+296 lần lặp, R1 đo được tỉ lệ request vượt trần là 1/296 ≈ 0,3%, và từ đó tính ra
+**~95% số lần chạy 14 lần lặp sẽ in ra ĐẠT** kể cả khi đuôi phân phối thật sự
+vượt trần. Điều kiện như vậy không phủ định được thì không phải là điều kiện.
+
+## Điều kiện xác nhận, viết lại
+
+**ADR-0002 được xác nhận khi, tại cấu hình pool đã chốt:**
+
+1. **p95 GỘP trên toàn bộ request của phép đo ≤ 50 ms** — gộp mọi lần lặp và mọi
+   hồ sơ dữ liệu thành MỘT mẫu, không lấy max của các p95 con.
+2. **Cỡ mẫu ≥ 5.000 request**, để "chạy ít cho đẹp" không còn là một chiến lược.
+   Harness tự đỏ nếu mẫu nhỏ hơn.
+3. **Báo kèm p99, max và số request vượt trần** — phần đuôi phải nhìn thấy được,
+   không được giấu sau một con số p95.
+
+Con số `max p95 qua các lần lặp` vẫn được ghi trong bằng chứng để đối chiếu,
+nhưng **không dùng để phán quyết**. Ghi rõ điều đó trong JSON.
+
+## Về phần đuôi — đừng quy sai chỗ
+
+R1 đo tương quan giữa "chờ pool p95" và "truy vấn max" trong cùng một lần lặp:
+**r = 0,920**. Nghĩa là những lần vọt không phải hiện tượng hàng đợi của pool —
+chúng là **cú khựng của cả máy**, kéo theo cả hai thành phần cùng lúc. Vì vậy câu
+"chỉnh pool mới giải quyết được, tối ưu truy vấn thì không" đúng cho phần thân
+phân phối và **sai cho phần đuôi**. Trên hạ tầng thật (OPN-03), phần đuôi sẽ do
+nhiễu của môi trường đó quyết định, không do thiết kế này quyết định.
+
+## Điều Sửa đổi 1 nói mà số liệu KHÔNG chống lưng
+
+Sửa đổi 1 viết *"pool lớn hơn không tốt hơn"* dựa trên một lần chạy. R1 kiểm bằng
+Mann-Whitney trên 56 lần lặp mỗi pool: **pool 20 tốt hơn pool 40 thật (p ≈ 1,2e-06)**,
+nhưng **pool 10 và pool 20 thì không phân biệt được (p ≈ 0,63)**. Vậy phát biểu
+đúng là: *pool 40 tệ hơn pool 20; pool 10 và 20 tương đương ở phép đo này.* Chọn
+20 vì nó cho nhiều dư địa hơn khi số bản sao tăng, không phải vì nó nhanh hơn 10.

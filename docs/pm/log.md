@@ -20,3 +20,12 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-19 | PM | Connor Pham | T0+T1 phiên 3 — T1 SKIP có lý do, chọn ADR-0002 | done · tok ≈ 6k | docs/pm/sessions/2026-08-19-1635.md |
 | 2026-08-19 | SA | Connor Pham | ADR-0002 phiên đăng nhập — bản Proposed | done · tok ≈ 22k | docs/adr/0002-phien-dang-nhap-va-thu-hoi-quyen.md |
 | 2026-08-19 | PM | Connor Pham | Gate B4 duyệt — tạo 6 ticket WMS-1..6, nạp sprint-1 | done · tok ≈ 18k | WMS-1 |
+| 2026-08-19 | DEV | Connor Pham | WMS-1 đo p95 lượt đọc phiên | failed: vòng review 2 người (R1+R2 REQUEST-CHANGES, 11 finding chặn) | evd/WMS-1/dev/review.md |
+| 2026-08-19 | PM | Connor Pham | T0+T1 phiên 4 — WMS-1 lần 2/2, T1 SKIP có lý do | done · tok ≈ 5k | docs/pm/sessions/2026-08-19-1747.md |
+| 2026-08-19 | DEV | Connor Pham | WMS-1 viết lại lần 2 — R2 APPROVE, R1 REQUEST-CHANGES | failed: vòng review 2 người (MỚI-1: cách đọc điều kiện ADR-0002) | evd/WMS-1/dev/review.md |
+| 2026-08-19 | PM | Connor Pham | T0+T1 phiên 5 — 4 quyết định, autonomy full, G-01/G-03 quyết tạm | done · tok ≈ 22k | docs/pm/decisions.md |
+| 2026-08-19 | SA | Connor Pham | ADR-0002 Sửa đổi 1+2 — trần gồm chi phí kết nối, điều kiện phủ định được | done · tok ≈ 14k | docs/adr/0002-phien-dang-nhap-va-thu-hoi-quyen.md |
+| 2026-08-19 | DEV | Connor Pham | WMS-1 lần viết 3 — 2 vòng review | failed: vòng review 2 người (CHẶN B trình sinh + SIGINT bị lờ) | evd/WMS-1/dev/review.md |
+| 2026-08-20 | PM | Connor Pham | T0 phiên 6 — 0 ticket dispatch được, chọn thi hành G-05 | done · tok ≈ 5k | docs/pm/sessions/2026-08-20-0843.md |
+| 2026-08-20 | DEVOPS | Connor Pham | Push đầu tiên + PR #2 + CI trên clone sạch, tự merge | done · tok ≈ 9k | PR #2 |
+| 2026-08-20 | DEV | Connor Pham | WMS-1 đóng theo A6 — nhận con số, xoá harness | done · tok ≈ 11k | evd/WMS-1/REPORT.md |

@@ -81,10 +81,15 @@ team:
   capacity_per_day: 0.8
 
 autonomy:
-  level: assisted
-  # agent may merge its own green PR — only honored at level: full; flip to
-  # false to keep every merge in human hands even at full autonomy
-  self_merge: false
+  # Nâng lên full ngày 2026-08-19 theo yêu cầu chủ dự án, sau 5 phiên mà mọi việc
+  # đều dừng ở hàng đợi. Ở mức này: câu đến hạn được máy quyết TẠM (🟡
+  # pending-acceptance, có lý do, đảo ngược được), QA tự đóng ticket đã pass,
+  # draft BA được challenger duyệt thì tự thành ticket.
+  level: full
+  # Bật cùng lúc: PR xanh tự merge vào develop. Đây là cửa cuối cùng rời khỏi tay
+  # người, nên hai thứ dưới đây là phanh duy nhất còn lại: gate phải xanh, và
+  # exemptions phải không dính.
+  self_merge: true
   exemptions:
     - real-money
     - legal
