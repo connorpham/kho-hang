@@ -33,3 +33,5 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-20 | DEV | Connor Pham | WMS-2 nền danh tính + migration đầu tiên | failed: vòng review 3 người (2/3 chữ ký, R3 REQUEST-CHANGES) | evd/WMS-2/dev/review.md |
 | 2026-08-20 | DEV | Connor Pham | WMS-2 lần thử 2 — ảnh chụp lược đồ, 2 vòng review | failed: vòng review (R3 CHẶN-2: ảnh chụp ghi định danh, không ghi định nghĩa) | evd/WMS-2/dev/review.md |
 | 2026-08-20 | PM | Connor Pham | T0 phiên 8 — dispatch WMS-2 lần 2/2 | done · tok ≈ 4k | docs/pm/sessions/2026-08-20-1030.md |
+| 2026-08-20 | PM | Connor Pham | T0+T1 phiên 9 — A9 gỡ khoá WMS-2 | done · tok ≈ 6k | docs/pm/decisions.md |
+| 2026-08-20 | DEV | Connor Pham | WMS-2 lần thử 3 — 3/3 chữ ký, PR #4 merge | done · tok ≈ 48k | PR #4 |
