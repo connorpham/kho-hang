@@ -15,7 +15,7 @@ cả ba là `opus` (dev-r2 được nâng tier vì high-stakes).
 
 ## VÒNG 1 — 12 finding chặn
 
-### R1 · truy vết yêu cầu
+### Lăng kính truy vết yêu cầu
 - **F1** AC3 không đạt, **và tác giả trích AC thiếu bảy chữ "theo ma trận SRS §8"** rồi
   kết luận là đạt. Hệ quả R1 chỉ ra mà tác giả không thấy: với NFR-SEC-04, ma trận
   rỗng nghĩa là **QTHT cũng không vào được SC-20** — đúng màn hình duy nhất dùng để
@@ -38,7 +38,7 @@ cả ba là `opus` (dev-r2 được nâng tier vì high-stakes).
   không một dòng giải thích · F9 `Kho.dangHoatDong` dẫn nguồn sai · F10 pool chưa đặt
   tường minh dù ADR-0003 nói đó là nghĩa vụ của WMS-2.
 
-### R2 · an toàn migration
+### Lăng kính an toàn migration
 - **CHẶN-1** Migration **không chạy trong transaction**. Prisma bắn từng câu autocommit.
   R2 chèn lỗi ở cuối file rồi deploy lên CSDL trắng: **12 bảng + toàn bộ seed đã
   commit**, `_prisma_migrations.finished_at=NULL`. Đường phục hồi chính thức cũng tắc
@@ -61,7 +61,7 @@ cả ba là `opus` (dev-r2 được nâng tier vì high-stakes).
   sống nguyên trong đó, chỉ là không ai với tới. **Toàn bộ migration và test vòng 1
   chạy nhầm server**, không phải server mà SRS §2.3 yêu cầu. → KI-003.
 
-### R3 · chất lượng test — 8 phép đột biến, **6 phép để 13/13 xanh nguyên**
+### Lăng kính chất lượng test — 8 phép đột biến, **6 phép để 13/13 xanh nguyên**
 | Đột biến | Kết quả |
 |---|---|
 | Xoá 2 bảng nối, thay bằng bảng rác 2 cột | 13/13 xanh |
@@ -90,7 +90,7 @@ A7 vào hàng đợi, pool = 20 tường minh, KI-003, cảnh báo README.
 
 ## VÒNG 2 — re-review
 
-### R1 · **APPROVE** — 10/10 finding đóng
+### Lăng kính truy vết — **APPROVE**, 10/10 finding đóng
 Kiểm bằng truy vấn riêng, không đọc lại báo cáo. Đáng chú ý:
 - **Tính nguyên tử:** chèn `SELECT 1/0` ngay trước `COMMIT`, deploy lên CSDL trắng →
   **còn đúng 1 bảng**. Rồi `migrate resolve --rolled-back` + deploy bản sạch → 12 bảng,
@@ -102,7 +102,7 @@ Kiểm bằng truy vấn riêng, không đọc lại báo cáo. Đáng chú ý:
 - 4 finding mới không chặn: hồ sơ review không tồn tại (chính file này), tên index lệch,
   chú thích lược đồ còn ghi "9 vai trò", và DC-06 không có test canh.
 
-### R2 · **APPROVE** — mọi finding đóng
+### Lăng kính migration — **APPROVE**, mọi finding đóng
 11/11 đường tấn công tầng ứng dụng nay bị chặn, gồm cả `TRUNCATE`,
 `session_replication_role='replica'`, `MERGE … WHEN MATCHED THEN DELETE`, và CTE
 `WITH x AS (UPDATE …)`. Ba đường còn lọt (`DISABLE TRIGGER ALL`, `CREATE OR REPLACE`
@@ -114,7 +114,7 @@ không còn tuyên bố sai sự thật.
 - **N2 🟡** tên index lệch ⇒ `migrate dev` sau sẽ sinh migration thừa. R2 đã đo: RENAME
   **giữ nguyên** NULLS NOT DISTINCT, nên là phiền toái chứ không phải hồi quy.
 
-### R3 · **REQUEST-CHANGES** — 7/8 đột biến cũ nay chết, nhưng 7 phép mới lọt
+### Lăng kính test — **REQUEST-CHANGES**, 7/8 đột biến cũ nay chết, nhưng 7 phép mới lọt
 | Đột biến | Kết quả |
 |---|---|
 | Mật khẩu **rõ** trong `mat_khau_hash` | **27/27 xanh** — NFR-SEC-03 không có gì thi hành |
@@ -163,7 +163,7 @@ cụ thể; WMS-2 còn một lần thử tự chọn trước khi chạm loop gu
 | 1 · `fcd0759` | **APPROVE** | REQUEST-CHANGES · CHẶN-1 + 1b |
 | 2 · `d6246d5` | không gọi lại (diff không chạm migration) | REQUEST-CHANGES · **CHẶN-2** |
 
-## R2 · APPROVE, kèm 6 ghi nhận
+## Lăng kính migration · APPROVE, kèm 6 ghi nhận
 Regex băm đúng cú pháp và đúng phạm vi đã tuyên bố; `map:` đóng drift (diff rỗng,
 gỡ `map:` thì hiện lại); replay từ CSDL trắng 38/38; tính nguyên tử còn nguyên
 (lỗi trước `COMMIT` → 1 bảng · gỡ `BEGIN/COMMIT` → 4 bảng rò); seed idempotent.
@@ -176,7 +176,7 @@ gỡ `map:` thì hiện lại); replay từ CSDL trắng 38/38; tính nguyên t�
   M-6 `mat_khau_hash` NOT NULL + CHECK ⇒ không có giá trị hợp lệ cho "đã tạo tài
   khoản, chưa đặt mật khẩu" (ràng buộc thiết kế cho WMS-3).
 
-## R3 vòng 1 · CHẶN-1 — vá theo tên đối tượng, không theo lớp
+## Lăng kính test, vòng 1 · CHẶN-1 — vá theo tên đối tượng, không theo lớp
 Đo được: 10/12 khoá ngoại · 3/6 chỉ mục duy nhất · `DROP TABLE phien` · mọi phép
 đổi kiểu cột — tất cả gỡ được mà **38/38 xanh**. Gồm `so_du_ton_kho_kho_id_fkey`,
 một trong ba khoá ngoại R1-F5 gọi thẳng tên. **CHẶN-1b:** REPORT viết "Không phép
@@ -188,7 +188,7 @@ nullable) · khoá ngoại (kèm `ON DELETE`) · chỉ mục duy nhất (kèm `N
 DISTINCT`) · CHECK · trigger (kèm `ALWAYS`/`ORIGIN`). Cộng M-1, M-2, và fixture
 đổi sang băm argon2id dài thật 98 ký tự.
 
-## R3 vòng 2 · CHẶN-1 và CHẶN-1b ĐÓNG, nhưng **CHẶN-2**
+## Lăng kính test, vòng 2 · CHẶN-1 và CHẶN-1b ĐÓNG, nhưng **CHẶN-2**
 
 **26/26** phép đột biến cũ nay đỏ, gồm cả 12 khoá ngoại và cả 6 chỉ mục gỡ riêng
 từng cái. 11/11 dòng trong bảng đột biến của REPORT **khớp chính xác** số R3 đo.
@@ -241,3 +241,223 @@ sinh ra để chặn. Đẩy lên bàn chủ dự án kèm một lựa chọn th
 đúng** — mọi ràng buộc tồn tại và hành xử đúng trên CSDL thật. Mọi phép lọt đều
 do reviewer tự tay đục vào lược đồ. Thứ còn thiếu là **độ sâu của hàng rào hồi
 quy**, không phải khuyết tật trong thứ WMS-2 giao.
+
+
+## Lăng kính test, vòng 3 · **APPROVE**
+
+**CHẶN-2 ĐÓNG.** Phép kiểm quyết định chạy lại nguyên văn:
+
+| | `d6246d5` | `5d22374` |
+|---|---|---|
+| Ảnh chụp tái sinh trên CSDL đã hỏng | **0 dòng khác** | **43 dòng khác** |
+| Test | 51/51 xanh | **10 failed / 44 passed** |
+
+9/9 phép N1…N10 chạy riêng đều đỏ. Tuyên bố "test không còn ghi đè fixture" được
+R3 kiểm bốn đường: mtime/kích thước/sha256 không đổi kể cả trên CSDL LỆCH; chạy
+lần hai vẫn đỏ chứ không tự sửa; import module thuần khi KHÔNG có `DATABASE_URL`
+thì nạp được mà không kết nối, không ghi file.
+
+**R3 tìm thêm 11 phép, 9 vẫn lọt — và phân loại TẤT CẢ là nợ ghi chép được**, theo
+một quy tắc dừng viết ra giấy TRƯỚC khi chấm: chỉ chặn khi lỗ đi tới được qua
+đường thay đổi hợp thức (`schema.prisma` → `prisma migrate`) VÀ phá một bất biến
+WMS-2 khẳng định. Đúng một phép (T15, gỡ `@@index`) thoả vế đầu và không thoả vế
+sau — nó là hồi quy độ trễ, không phải tính đúng đắn. Mười phép còn lại đòi hành
+động DBA ngoài băng với quyền superuser.
+
+**Nợ đã ghi vào `scripts/luoc-do-mat.mjs` §Phạm vi thành thật** (7 mục R3 ĐO, không
+phải tác giả đoán): chỉ mục không-duy-nhất · trigger nội bộ (`DISABLE TRIGGER ALL`
+làm khoá ngoại còn nguyên mà không thi hành) · `relpersistence` · `proconfig`/
+`prosecdef` · `datetime_precision` · RULE và policy RLS · ACL/collation/quyền sở
+hữu/sequence/event trigger.
+
+**Hai chỗ hồ sơ của tác giả sai, R3 bắt và đã sửa:** tiêu đề "54 test" trong khi
+khối output dán bên dưới ghi `51 passed` (lần thứ năm dán số về công việc của
+chính mình mà không kiểm — lần này thấp hơn thực tế, nên là cẩu thả chứ không
+phải thổi phồng); và "áp 8 đột biến → 15 dòng" trong khi mục trên nói 9 phép —
+nay ghi rõ hai tập đột biến khác nhau cho hai con số khác nhau.
+
+**MY WEAK SPOT của R3, đáng đọc hơn cả finding:**
+*"Lời tiên đoán 'sẽ tìm ra tầng thứ tư' nói về PHƯƠNG PHÁP CỦA TÔI, không nói về
+công việc của tác giả. Một hàng rào lược đồ có độ sâu không giới hạn; phương pháp
+của tôi sinh ra một tầng mới mỗi vòng vô điều kiện, nên 'tôi lại tìm được lỗ' gần
+như không mang thông tin về việc công việc đã xong hay chưa."* Và: *"Nếu không có
+quy tắc dừng tôi đã chặn vì T14 — cảm giác 'nặng' ấy đến từ công tôi bỏ ra để đào
+nó lên, không đến từ rủi ro thật."* Và: *"Ba vòng liền tôi chưa một lần tìm ra
+khuyết tật trong SẢN PHẨM — chỉ tìm ra lỗ trong lưới hồi quy của nó."*
+
+### Bằng chứng vòng 3 (đã thực sự chạy trên bản nhân bản `wms2_r3v3`)
+
+1. **Phép kiểm quyết định, chạy lại nguyên văn** — áp cả 9 phép N1…N10 cùng lúc lên
+   bản nhân bản, rồi sinh lại ảnh chụp bằng chính `MAT` của tác giả
+   (`scripts/luoc-do-mat.mjs:20`) trên CSDL đã hỏng:
+   ```
+   diff luoc-do.snapshot.json(gốc) luoc-do.snapshot.json(sinh trên CSDL hỏng)
+   → 43 dòng khác   (vòng trước: 0 dòng)
+   npm run test:integration → 10 failed | 44 passed (54)
+   ```
+   Cả bảy mặt đều đỏ. Diff chỉ đích danh: `nhat_ky_thao_tac RLS` ·
+   `DEFAULT 0→5` · mất `nguoi_dung_kho PRIMARY KEY` · 12 dòng khoá ngoại rụng
+   `ON UPDATE CASCADE` · `kho_ma_key … btree (id)` · `… WHERE dang_hoat_dong` ·
+   biểu thức CHECK nới ra · `body=1bdcee…→32b3d0…` · `WHEN ((old.dia_chi_ip <> …))`.
+
+2. **9 phép N1…N10 chạy TỪNG CÁI** trên bản nhân bản riêng
+   (`scripts/luoc-do-mat.mjs:26-96` là bảy mặt bị nhắm):
+   ```
+   N1 ON UPDATE CASCADE→NO ACTION ×12  → 1 đỏ, diff 24 dòng
+   N2 unique cùng tên, cột khác        → 1 đỏ, diff  2
+   N3 unique → partial, giữ tên        → 1 đỏ, diff  2
+   N4 CHECK giữ tên, nới biểu thức     → 1 đỏ, diff  2
+   N5 đổi DEFAULT                      → 1 đỏ, diff  2
+   N6 gỡ khoá chính bảng nối           → 1 đỏ, diff  1
+   N8 ENABLE ROW LEVEL SECURITY        → 1 đỏ, diff  2
+   N9 cửa hậu trong thân chan_sua_xoa()→ 1 đỏ, diff  8
+   N10 thêm WHEN vào trigger           → 4 đỏ, diff  2
+   ```
+   Vòng trước cả 9 phép này đều 0 đỏ.
+
+3. **Kiểm tuyên bố "test không còn ghi đè fixture"** — bốn đường, nhắm
+   `src/lib/__tests__/nen-danh-tinh.itest.ts:14` (import module thuần) và
+   `scripts/chup-luoc-do.mjs:31` (nơi duy nhất còn `writeFileSync`):
+   ```
+   mtime · size · sha256 trước/sau chạy test (CSDL sạch) : 11:23:18 · 8090 · 737347de… → KHÔNG ĐỔI
+   … sau chạy trên CSDL LỆCH (thêm kho.cot_la)           : KHÔNG ĐỔI, test 1 failed | 53 passed
+   … chạy lần 2 trên cùng CSDL lệch                      : VẪN 1 failed, git status rỗng
+   import luoc-do-mat.mjs khi KHÔNG có DATABASE_URL      : nạp được, 7 mặt, không kết nối, không ghi
+   ```
+
+4. **11 phép đột biến MỚI**, nhắm vào chỗ bảy mặt có thể vẫn hẹp
+   (`scripts/luoc-do-mat.mjs:56` lọc `indisunique`, `:90` lọc `NOT tgisinternal`):
+   ```
+   T14 DISABLE TRIGGER ALL (trigger nội bộ RI) → 54/54 xanh, diff 0 → chèn được dòng mồ côi
+   T15 gỡ cả 6 chỉ mục không-duy-nhất          → 54/54 xanh, diff 0
+   T2  SET UNLOGGED hai bảng chỉ-ghi-thêm      → 54/54 xanh, diff 0
+   T1  RESET search_path + SECURITY DEFINER    → 54/54 xanh, diff 0
+   T12 timestamptz → timestamptz(0)            → 54/54 xanh, diff 0
+   T4  CREATE RULE … DO INSTEAD NOTHING        → 3 ĐỎ  (test hành vi bắt, không phải ảnh chụp)
+   T10 che bóng lược đồ qua search_path        → 24 ĐỎ, diff 14 dòng
+   ```
+
+5. **Cổng chuẩn**: `lint` · `typecheck` · `npm test` 15/15 · `npm run test:integration`
+   54/54 trên `PostgreSQL 17.10 · stockflow_wms`.
+
+**Điểm yếu tự nhận:** ba điểm ở trên.
+
+---
+
+# CARD CUỐI CÙNG — 3/3 chữ ký
+
+## R1 · lăng kính truy vết yêu cầu · **APPROVE**
+
+Cả 10 finding vòng 1 đóng, kiểm bằng truy vấn riêng trên CSDL thật, không đọc lại
+bảng trong báo cáo của tác giả.
+
+**Tried to break:**
+- Chèn thật một dòng nhật ký đăng nhập thất bại với `nguoi_dung_id = NULL`
+  (`prisma/schema.prisma:299`): `INSERT … VALUES (NULL,'khong-ton-tai-xyz',…)` →
+  `id=41`, đọc lại `n=1`. Trỏ tới `999999` vẫn `23503` ⇒ nullable không làm mất
+  toàn vẹn. Finding F2 đóng.
+- Xoá `nguoi_dung` còn dấu vết trong sổ (`prisma/schema.prisma:106`) →
+  `23503 chuyen_dong_kho_nguoi_thuc_hien_id_fkey`; xoá `kho` →
+  `23503 chuyen_dong_kho_kho_id_fkey`. Kiểm bằng HÀNH VI, không bằng catalog.
+- Chèn `SELECT 1/0` ngay trước `COMMIT` của
+  `prisma/migrations/20260820022117_wms2_nen_danh_tinh/migration.sql` rồi deploy
+  lên CSDL trắng → **còn đúng 1 bảng**; `migrate resolve --rolled-back` + deploy
+  bản sạch → 12 bảng, seed đủ. Đường phục hồi vòng trước tắc, nay thông.
+- Đo pool thay vì đọc code (`src/lib/prisma.ts:20`): bắn 40 truy vấn `pg_sleep`
+  đồng thời, `pg_stat_activity` đỉnh 21 (gồm 1 kết nối quan sát) ⇒ trần đúng 20.
+- Truy vấn `information_schema`: `timestamp without time zone` = **0**,
+  `timestamptz` = 17.
+
+**Điểm yếu tự nhận:** không đọc được AC gốc trong Jira nên chỉ đối chiếu được
+giữa ba tài liệu do cùng một tác giả viết; chọn không chặn ở việc hồ sơ review
+chưa commit, và tự nhận lựa chọn ngược lại cũng đứng được.
+
+## R2 · lăng kính an toàn migration · **APPROVE**
+
+Mọi finding đóng. Ba đường còn lọt đúng bằng ba đường mà `prisma/migrations/20260820022117_wms2_nen_danh_tinh/migration.sql:275` đã tự khai là
+không chặn được — không còn tuyên bố sai sự thật.
+
+**Tried to break:**
+- 11 đường tấn công tầng ứng dụng trên bản nhân bản có dữ liệu mồi thật:
+  `UPDATE`/`DELETE`/`TRUNCATE` cả hai bảng chỉ-ghi-thêm, `SET
+  session_replication_role='replica'` rồi `DELETE` và `TRUNCATE`, `TRUNCATE
+  nguoi_dung CASCADE`, `INSERT … ON CONFLICT DO UPDATE`, `MERGE … WHEN MATCHED
+  THEN DELETE`, CTE `WITH x AS (UPDATE …)` — tất cả bị chặn bởi `prisma/migrations/20260820022117_wms2_nen_danh_tinh/migration.sql:295`.
+- Migration hỏng giữa chừng: chèn một câu lỗi trước `COMMIT` (`prisma/migrations/20260820022117_wms2_nen_danh_tinh/migration.sql:347`) → còn 1
+  bảng, `finished_at=NULL`. Đối chứng gỡ `BEGIN;` (`prisma/migrations/20260820022117_wms2_nen_danh_tinh/migration.sql:13`) → **4 bảng rò**.
+- Replay từ CSDL trắng bằng `npx prisma migrate deploy` → 12 bảng, `quyen=120
+  vai_tro=10 vai_tro_quyen=120`, 4 trigger `tgenabled=A`, 12 khoá ngoại,
+  `timestamp without time zone` = 0; bộ test 54/54 trên chính CSDL đó.
+- 25 chuỗi thử qua CHECK định dạng băm (`prisma/migrations/20260820022117_wms2_nen_danh_tinh/migration.sql:319`): chặn chuỗi rỗng, `$argon2xx$`,
+  MD5/SHA256 hex, `$2x$`, chữ hoa, khoảng trắng đầu; lọt `$2b$` cụt và mật khẩu
+  rõ vô tình bắt đầu bằng `$2b$` — đúng phạm vi chú thích đã tự khai.
+- Đối chứng drift: có `map:` ở `prisma/schema.prisma:69` → `npx prisma migrate
+  diff` rỗng; gỡ `map:` → `ALTER INDEX … RENAME TO …`.
+
+**Điểm yếu tự nhận:** chạy toàn bộ với vai `postgres` = chủ sở hữu bảng, nên
+"trigger không chặn được chủ sở hữu" là điều xác nhận chứ không phải giải quyết;
+chỉ một node, không replication; không chạy được workflow CI thật.
+
+## R3 · lăng kính chất lượng test · **APPROVE**
+
+CHẶN-2 đóng. Chín phép đột biến từng lọt nay đều đỏ; phép kiểm quyết định cho 43
+dòng khác thay vì 0. Chỗ hở còn lại được phân loại là nợ ghi chép được, theo một
+quy tắc dừng viết ra giấy trước khi chấm.
+
+**Tried to break:**
+- Phép kiểm quyết định: áp cả 9 phép N1…N10 cùng lúc rồi sinh lại ảnh chụp bằng
+  chính `MAT` ở `scripts/luoc-do-mat.mjs:20` trên CSDL đã hỏng → **43 dòng khác**
+  (vòng trước 0) và `npm run test:integration` cho **10 failed / 44 passed**.
+- 9 phép chạy RIÊNG từng cái, nhắm bảy mặt ở `scripts/luoc-do-mat.mjs:26`: N1 →
+  1 đỏ/diff 24 · N2 → 1/2 · N3 → 1/2 · N4 → 1/2 · N5 → 1/2 · N6 → 1/1 · N8 → 1/2
+  · N9 (cửa hậu trong thân hàm) → 1/8 · N10 → 4 đỏ/diff 2. Vòng trước cả 9 đều 0 đỏ.
+- Bốn đường kiểm "test không còn ghi đè fixture", nhắm
+  `src/lib/__tests__/nen-danh-tinh.itest.ts:14` và `scripts/chup-luoc-do.mjs:31`:
+  mtime/size/sha256 không đổi kể cả trên CSDL LỆCH; chạy lần hai vẫn đỏ chứ không
+  tự sửa; import module thuần khi không có `DATABASE_URL` thì không kết nối.
+- 11 phép đột biến MỚI nhắm chỗ bảy mặt còn hẹp — `scripts/luoc-do-mat.mjs:56`
+  (lọc `indisunique`) và `scripts/luoc-do-mat.mjs:90` (lọc `NOT tgisinternal`):
+  9 phép lọt (T14, T15, T2, T1, T12, T13, T5, T6, T7), 2 phép bị bắt (T4 → 3 đỏ
+  bởi test hành vi, T10 → 24 đỏ).
+- Cổng chuẩn: `npm run lint` · `npx tsc --noEmit` · `npm test` 15/15 ·
+  `npm run test:integration` 54/54 trên `PostgreSQL 17.10 · stockflow_wms`.
+
+**Hai phương án đã cân, và tiêu chí phân định (A vs B):**
+
+| | **Phương án A — chặn merge** | **Phương án B — ghi thành nợ** |
+|---|---|---|
+| Lập luận | Còn 9 phép đột biến lọt; T14 làm khoá ngoại còn nguyên trong `pg_constraint` mà không còn thi hành, chèn được dòng mồ côi ⇒ BR-22 vỡ | Lược đồ sản phẩm đúng; mọi phép lọt đều do reviewer tự tay đục vào, không đi tới được qua `prisma migrate` |
+| Giá phải trả | Một vòng nữa, mà chính reviewer dự đoán sẽ lộ tầng thứ năm — hàng rào lược đồ có độ sâu không giới hạn | Bảy mục nợ nằm trong `scripts/luoc-do-mat.mjs:14` chờ ticket sau; nếu một mục thành lỗ thật thì phát hiện muộn hơn |
+| Rủi ro thật hôm nay | T14/T5/T13/T6 đòi quyền superuser hoặc chủ sở hữu — cùng họ với `DROP TRIGGER` mà `prisma/migrations/20260820022117_wms2_nen_danh_tinh/migration.sql:275` đã tự khai là không chặn nổi | Cụm chỉ có MỘT role (`postgres`) và ứng dụng kết nối bằng chính nó; ACL/RLS/quyền sở hữu chỉ có nghĩa sau khi OPN-03 đẻ ra role ứng dụng |
+
+**Tiêu chí phân định, viết ra giấy TRƯỚC khi chấm:** chỉ chặn khi lỗ (a) đi tới
+được qua đường thay đổi hợp thức (`prisma/schema.prisma` → `prisma migrate`) **và**
+(b) phá một bất biến mà chính WMS-2 khẳng định. Trong 11 phép mới, đúng **một**
+(T15, gỡ `@@index`) thoả (a), và nó **không** thoả (b) — gỡ chỉ mục là hồi quy độ
+trễ, không phải tính đúng đắn, và độ trễ có làn đo riêng. **Chọn B.**
+
+Không có tiêu chí này thì reviewer đã chọn A vì T14 — và tự nhận rằng cảm giác
+"nặng" của T14 đến từ công bỏ ra để đào nó lên, không từ rủi ro thật của nó.
+
+**Điểm yếu tự nhận:** *"lời tiên đoán 'sẽ tìm ra tầng thứ tư' nói về phương pháp
+của tôi, không nói về công việc của tác giả"*; *"nếu không có quy tắc dừng tôi đã
+chặn vì T14, và cảm giác nặng ấy đến từ công tôi bỏ ra để đào nó lên"*; *"ba vòng
+liền tôi chưa một lần tìm ra khuyết tật trong sản phẩm — chỉ tìm ra lỗ trong lưới
+hồi quy của nó."*
+
+---
+
+# KẾT: 3/3 chữ ký · WMS-2 đủ điều kiện merge
+
+| Reviewer | Lăng kính | Vòng cuối |
+|---|---|---|
+| R1 (opus) | truy vết yêu cầu | **APPROVE** — 10/10 finding đóng |
+| R2 (opus) | an toàn migration | **APPROVE** — 11/11 đường tấn công tầng ứng dụng bị chặn |
+| R3 (opus) | chất lượng test | **APPROVE** — CHẶN-2 đóng, còn lại là nợ ghi chép được |
+
+Tổng: **3 lần thử · 5 vòng review · 12 + 3 + 2 finding chặn**. Ticket ước lượng
+1,5 pd. Điều đáng giữ lại không phải con số đó mà là hình dạng của các finding:
+vòng 1 bắt lỗi trong sản phẩm; vòng 2–3 bắt lỗi trong hàng rào; vòng 4–5 bắt lỗi
+trong hàng rào của hàng rào. Và ở vòng cuối, chính reviewer là người nói ra rằng
+tầng tiếp theo sẽ luôn tồn tại — nên điểm dừng phải là một quy tắc viết trước,
+không phải cảm giác đã đủ.

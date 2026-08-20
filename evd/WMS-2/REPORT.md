@@ -41,8 +41,8 @@ nhat_ky_thao_tac.nguoi_dung_id: NULLABLE
 ```
 $ npm run test:integration
      [itest] PostgreSQL 17.10 · stockflow_wms
-         Tests  51 passed (51)
-      Duration  295ms (transform 29ms, setup 0ms, collect 36ms, tests 101ms, environment 0ms, prepare 34ms)
+         Tests  54 passed (54)
+      Duration  270ms (transform 29ms, setup 0ms, collect 40ms, tests 77ms, environment 0ms, prepare 35ms)
 ```
 
 ## Lần thử 2 — năm việc R3 đòi, và một lỗi tôi tự tìm ra
@@ -96,8 +96,11 @@ Nay dùng `pg_get_constraintdef()` · `pg_get_indexdef()` · `pg_get_triggerdef(
 `md5(thân hàm trigger)`, thêm `column_default`, thêm mặt **khoá chính** (bản cũ
 loại trừ `indisprimary` hẳn) và mặt **bảng + RLS**. Bảy mặt.
 
-**Chạy lại đúng phép kiểm của R3:** áp 8 đột biến rồi sinh lại ảnh chụp trên CSDL
-hỏng → **khác 15 dòng**, và diff chỉ thẳng vào từng phép:
+**Chạy lại đúng phép kiểm của R3.** Tác giả áp **8** phép (N9, N4, N6, N5, N2, N8
+và hai lệnh phụ trợ) → ảnh chụp khác **15 dòng**. Reviewer R3 sau đó áp **cả 9**
+phép N1…N10 → khác **43 dòng** và **10/54 test đỏ**. Hai con số khác nhau vì hai
+tập đột biến khác nhau; số của R3 là số đầy đủ. Trước khi sửa, cả hai tập đều cho
+**0 dòng khác**. Diff chỉ thẳng vào từng phép:
 
 ```
 <  "nguoi_dung.so_lan_sai_lien_tiep int4(32,0) DEFAULT 0"

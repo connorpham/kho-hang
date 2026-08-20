@@ -9,9 +9,30 @@
 //
 // Luật: file này không được có một dòng nào ngoài định nghĩa.
 //
-// Phạm vi thành thật: bảy mặt dưới đây, không hơn. CHƯA canh: GRANT/ACL,
-// collation, quyền sở hữu, bước nhảy sequence, event trigger, và thân hàm KHÔNG
-// phải hàm trigger. Đừng đọc file này như một bảo đảm toàn diện.
+// PHẠM VI THÀNH THẬT — bảy mặt dưới đây, không hơn.
+//
+// Danh sách "chưa canh" dưới đây do reviewer R3 ĐO, không phải tác giả đoán. Bản
+// trước của danh sách này thiếu bảy mục đầu, và R3 nói đúng: một danh sách phạm
+// vi không đủ thì cũng là một khẳng định sai, chỉ khiêm tốn hơn.
+//
+//   1. Chỉ mục KHÔNG duy nhất (`@@index`) — mặt 5 lọc `indisunique`. Gỡ cả 6 chỉ
+//      mục vẫn 54/54. Đây là lỗ DUY NHẤT trong danh sách này đi tới được bằng
+//      một sửa đổi `schema.prisma` bình thường; nó là hồi quy ĐỘ TRỄ, không phải
+//      tính đúng đắn, và độ trễ có làn đo riêng.
+//   2. Trigger NỘI BỘ (ràng buộc toàn vẹn của khoá ngoại) — mặt 7 lọc
+//      `NOT tgisinternal`, nên `DISABLE TRIGGER ALL` khiến khoá ngoại còn nguyên
+//      trong `pg_constraint` mà KHÔNG còn thi hành. R3 chèn được dòng mồ côi.
+//   3. `relpersistence` — `SET UNLOGGED` trên bảng chỉ-ghi-thêm không để lại dấu.
+//   4. `proconfig` / `prosecdef` của hàm trigger — gỡ `search_path` (chính phòng
+//      thủ R2 đòi ở vòng 1) hoặc bật `SECURITY DEFINER` đều không đổi md5 thân hàm.
+//   5. `datetime_precision` — `timestamptz` → `timestamptz(0)` mất thứ tự trong giây.
+//   6. RULE (`pg_rewrite`) và policy của RLS (`pg_policies`).
+//   7. GRANT/ACL, collation mức cột, quyền sở hữu, bước nhảy sequence, event
+//      trigger, thân hàm không phải hàm trigger.
+//
+// Sáu nhóm cuối chỉ có nghĩa vận hành sau khi OPN-03 đẻ ra một role ứng dụng tách
+// khỏi chủ sở hữu; hôm nay cụm chỉ có một role superuser. Đừng đọc file này như
+// một bảo đảm toàn diện.
 export const MAT = {
   bang: `
       -- Mặt MỚI. R3 bật ROW LEVEL SECURITY không kèm policy: 51/51 xanh, nhưng
