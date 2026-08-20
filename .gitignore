@@ -23,6 +23,20 @@ evd/**
 docs/*.docx
 docs/*.pdf
 docs/*.html
+# Q3 + Q4 chốt 2026-08-19: giữ repo public, nên TOÀN BỘ tầng spec — cả bản
+# nguồn lẫn shard — chỉ nằm ở máy. Shard là trích nguyên văn SRS nên commit
+# shard cũng là công bố tài liệu mật, y hệt commit bản nguồn.
+# HỆ QUẢ ĐÃ ĐO, đừng ngạc nhiên khi gặp (docs/pm/decisions.md Q4):
+#   - file bị ignore KHÔNG có trong `git worktree` → lane nền của /team và CI
+#     đều mù spec. Việc gì cần đọc spec phải chạy trên cây làm việc chính.
+#   - dor_check.py:46 chỉ so chuỗi, không kiểm file tồn tại → ticket trích
+#     "docs/specs/…" vẫn xanh dù người khác không có file đó.
+# Dựng lại tầng spec trên máy mới: xem README §Tầng spec cục bộ.
+docs/specs/
+# Cùng lý do: user story và tiêu chí chấp nhận là nội dung DẪN XUẤT từ spec mật
+# (AC trích thẳng câu FR). Commit backlog draft = công bố spec bằng đường vòng.
+# Nội dung ticket đi vào Jira (private) — đó mới là chỗ của nó.
+docs/backlog/
 
 # ── Next.js / Node ─────────────────────────────────────────────────────────
 /node_modules

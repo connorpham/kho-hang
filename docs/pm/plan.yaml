@@ -8,3 +8,20 @@
 #   items:
 #     - "PROJ-1 1.5"
 #     - "PROJ-2 0.5"
+
+# Q2 đã chốt 2026-08-19 (docs/pm/decisions.md): sprint-1 bắt đầu ngay hôm nay.
+# 10 ngày làm việc (19/08 Tư → 01/09 Ba) × capacity_per_day 0.8 = 8 person-day.
+# Batch #1 qua gate B4 ngày 19/08 (chủ dự án duyệt). T-00 tách làm hai vì
+# ADR-0002 được chấp nhận KÈM ĐIỀU KIỆN đo trước: WMS-1 đi lấy số, WMS-2 mới
+# dựng lược đồ. 5.5 pd trên 8.0 pd — chừa 2.5 pd vì chưa ticket nào chạy hết
+# vòng nên chưa có throughput thật để tin.
+sprint-1:
+  start: 2026-08-19
+  end: 2026-09-01
+  items:
+    - "WMS-1 0.5"
+    - "WMS-2 1.5"
+    - "WMS-3 1.5"
+    - "WMS-4 1.0"
+    - "WMS-5 0.5"
+    - "WMS-6 0.5"
