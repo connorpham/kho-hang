@@ -1,91 +1,89 @@
-# WMS-1 — Chi phí lượt đọc phiên (điều kiện chốt ADR-0002)
+# WMS-1 — Chi phí lượt đọc phiên (hồ sơ ĐÓNG, 2026-08-20)
 
-> **File này do máy sinh** từ `evd/WMS-1/do-p95.json` bằng
-> `scripts/sinh-bao-cao-wms1.py`. Cả **số** lẫn **câu so sánh** đều suy từ dữ liệu —
-> không khẳng định nào được viết cứng.
-> Lần viết **3** · đo lúc `2026-08-19T11:33:53.574Z` · **TỔNG chờ pool + truy vấn — A4 (2026-08-19) chốt trần 50 ms GỒM chi phí lấy kết nối; ADR-0002 Sửa đổi 1**
+**Ticket đóng theo quyết định A6 của chủ dự án: nhận con số, bỏ harness.**
+File này là bản ghi cuối, viết một lần và không sinh lại được nữa — trình sinh
+báo cáo đã bị xoá cùng script đo (lý do ở mục cuối).
 
-## Phán quyết
-
-**ADR-0002 ĐẠT điều kiện của chính nó** (ADR-0002 §Sửa đổi 2), ở cấu hình pool 20.
-
-Thống kê phán quyết: **p95 GỘP trên toàn bộ request ở cấu hình phán quyết** — không phải max của các p95 con. Đổi
-tiêu chí vì R1 chứng minh tiêu chí cũ lật phán quyết chỉ bằng cách tăng số lần lặp.
+## Con số — thứ duy nhất trong hồ sơ này đã được kiểm chứng độc lập
 
 | | |
 |---|---|
-| Cỡ mẫu | **14,000** request (tối thiểu 5,000) |
-| p50 / **p95** / p99 | 3.40 / **5.20** / 6.22 ms |
-| Lớn nhất | 7.28 ms |
+| Thống kê | p95 GỘP trên toàn bộ request, tại pool 20 |
+| Cỡ mẫu | **14.000** request (7 lần lặp × 2 hồ sơ dữ liệu, 200 người đồng thời) |
+| p50 / **p95** / p99 | 3,403 / **5,2031** / 6,22001 ms |
+| Lớn nhất | 7,278 ms |
 | Trần | 50 ms (10% ngân sách 500 ms, NFR-PER-02) |
+| Vượt trần | **0 / 14.000 request** |
 
-**Không một request nào trong 14,000 request vượt trần 50 ms** — giá trị lớn nhất quan sát được là 7.28 ms, tức còn cách trần 6.9 lần.
+**Vì sao con số này đáng tin trong khi harness thì không:** reviewer R1 đã tính
+lại p95 **độc lập** từ 14.000 mẫu thô nằm trong `do-p95.json` (`thoTongMs`), bằng
+cài đặt riêng và đối chiếu `numpy.percentile` — khớp tới chữ số cuối:
+`5,2031 = 5,2031 = 5,2031`. Ai muốn kiểm lại cũng chỉ cần đọc mảng đó, không phải
+tin bất kỳ dòng nào của tôi và cũng không cần chạy lại script.
 
-Để đối chiếu, con số theo tiêu chí CŨ (max p95 qua các lần lặp) là
-6.29 ms. Tiêu chí cũ (max p95 qua các lần lặp) đã bị bỏ: kỳ vọng của max tăng theo số lần lặp nên nó đo thời lượng đo, không đo hệ thống. Con số đó vẫn được ghi ở maxP95QuaCacLanLap để đối chiếu, KHÔNG dùng để phán quyết.
+Đo theo cách đọc mà **A4** đã chốt: trần 50 ms áp cho **TOÀN BỘ** chi phí thêm của
+một request, gồm cả thời gian chờ lấy kết nối (xem ADR-0002 §Sửa đổi 1).
+Tiêu chí phán quyết theo **ADR-0002 §Sửa đổi 2** (p95 gộp trên ≥5.000 request),
+sau khi R1 chứng minh tiêu chí cũ ("lấy lần xấu nhất") đo thời lượng đo chứ không
+đo hệ thống.
 
-## Kích thước pool
+## Điều số liệu nói mà thiết kế cần nhớ
 
-| Pool | TỔNG p95 trung vị (ms) | TỔNG p95 xấu nhất (ms) |
-|---|---|---|
-| 10 | 5.8 | 7.3 |
-| 20 ← | 5.6 | 6.3 |
-| 40 | 7.4 | 8.8 |
+- **Thành phần lớn nhất là hàng đợi kết nối, không phải CSDL.** Chờ pool p95 xấu
+  nhất 5,836 ms so với truy vấn 0,793 ms. Ở phần thân phân phối, chỉnh pool mới
+  giải quyết được; tối ưu SQL thì không.
+- **Rác trong bảng phiên không làm chậm.** Bảng phình lên 506 MB / 2.000.200 dòng,
+  vượt xa `shared_buffers` 128 MB, mà trung vị không xấu đi. Dọn phiên hết hạn là
+  chuyện dung lượng đĩa.
+- **Pool 40 tệ hơn pool 20; pool 10 và 20 thì không phân biệt được** (R1 kiểm bằng
+  Mann-Whitney). Chọn 20 vì dư địa khi tăng số bản sao, không phải vì nó nhanh hơn 10.
 
-Theo trung vị, pool **20** cho con số thấp nhất (5.6 ms). Pool 10 (5.8 ms, +4%) **không phân biệt được** với pool 20 ở phép đo này. Pool 40 tệ hơn rõ rệt (7.4 ms, +31%).
+## Giới hạn — con số này KHÔNG chứng minh những điều sau
 
-`max_connections` = **100**. Quy tắc của ADR là ràng buộc TỔNG
-(`số bản sao × pool + dự phòng ≤ max_connections`), nên pool 20 cho tối đa 3 bản
-sao còn 40 kết nối dự phòng.
-
-## Ổn định qua 7 lần lặp (pool 20)
-
-| Hồ sơ | Số dòng | MB | TỔNG p95 mỗi lần (ms) | Trung vị |
-|---|---|---|---|---|
-| `sach` | 200 | 0.1 | 5.0 · 5.9 · 5.6 · 6.3 · 5.3 · 5.6 · 5.9 | 5.6 |
-| `rac_2_trieu` | 2,000,200 | 506.3 | 5.3 · 4.7 · 5.0 · 4.6 · 4.6 · 4.6 · 5.0 | 4.7 |
-
-Trong lần chạy này: hồ sơ `sach` **không có điểm vọt** (xấu nhất 6.3 ms so với trung vị 5.6 ms); hồ sơ `rac_2_trieu` **không có điểm vọt** (xấu nhất 5.3 ms so với trung vị 4.7 ms).
-
-## Hai điều số liệu nói
-
-**1. Thành phần lớn nhất là hàng đợi kết nối, không phải CSDL.** Chờ pool xấu nhất
-**5.84 ms** so với truy vấn **0.79 ms**.
-Ở phần THÂN phân phối, chỉnh pool mới giải quyết được, tối ưu SQL thì không.
-Ở phần ĐUÔI thì khác: R1 đo tương quan giữa chờ-pool và truy-vấn trong cùng lần lặp
-là **r = 0,920** — những cú vọt kéo cả hai thành phần cùng lúc, tức là cú khựng của
-cả máy chứ không phải hiện tượng hàng đợi.
-
-**2. Bảng phình lên 506 MB / 2,000,200 dòng, vượt xa `shared_buffers` 128MB, mà trung vị chỉ đổi -16% (5.6 → 4.7 ms) — **không phân biệt được**. Dọn phiên hết hạn là chuyện dung lượng đĩa, không phải tốc độ.**
-
-Suy giảm **truy vấn** khi 200 người đồng thời (so cùng loại với
-nền, cả hai đều không gồm chờ pool):
-**393–682%** (vượt mốc cảnh báo 20%).
-Đây là số liệu, không phải phán quyết NFR-PER-05. NFR-PER-05 là tiêu chí ở mức màn hình (thời gian phản hồi đầu cuối). Phép đo này đo một thành phần nên KHÔNG kết luận đạt/trượt NFR-PER-05. Con số suy giảm ở đây là cảnh báo mang sang WMS-2.
-
-## Giới hạn — những gì con số này KHÔNG chứng minh
-
-1. **Mô hình tải là "cả 200 người ập vào cùng lúc"**, không phải
-   trạng thái ổn định có thời gian nghĩ. Bi quan ở phần hàng đợi đến — nhưng **lạc
-   quan ở ba chỗ**, và phải nói cả ba: (a) chỉ MỘT pool đập vào CSDL, trong khi quy
-   tắc của ADR giả định 3 bản sao; (b) pool ở đây chỉ phục vụ đúng một câu truy vấn
-   phiên, còn trong ứng dụng thật 20 kết nối đó gánh MỌI truy vấn của MỌI request —
-   và chờ pool chính là thứ A4 vừa kéo vào trần 50 ms; (c) không có thời gian nghĩ
+1. Mô hình tải là "cả 200 người ập vào cùng lúc", không phải trạng thái ổn định.
+   Bi quan ở hàng đợi đến, nhưng **lạc quan ở ba chỗ**: chỉ MỘT pool đập vào CSDL
+   (quy tắc ADR giả định 3 bản sao); pool ở đây chỉ phục vụ đúng một câu truy vấn
+   phiên, còn thật thì gánh mọi truy vấn của mọi request; không có thời gian nghĩ
    nên cache luôn nóng.
-2. **Không chạm đĩa lần nào.** EXPLAIN (ANALYZE, BUFFERS) trên bộ 2 triệu dòng cho shared hit, read=0 — toàn bộ tập nóng nằm trong shared_buffers. Phép đo này KHÔNG chạm đĩa lần nào.
-3. **Không có độ trễ mạng** — CSDL cùng máy với tiến trình đo.
-4. **Không đo qua Prisma** — ADR-0001 chọn Prisma 7 + `@prisma/adapter-pg`.
-5. **Chỉ đo lượt ĐỌC** — ghi `thao_tac_cuoi_luc` và nhánh xoá phiên hết hạn chưa đo.
-6. **`shared_buffers` 128MB và `max_connections` 100
-   đều là mặc định của image**, chưa phải cấu hình chạy thật — OPN-03 quyết cái đó.
+2. Không có độ trễ mạng — CSDL cùng máy với tiến trình đo.
+3. Không đo qua Prisma, dù ADR-0001 chọn Prisma 7 + `@prisma/adapter-pg`.
+4. Chỉ đo lượt ĐỌC. Ghi `thao_tac_cuoi_luc` và nhánh xoá phiên hết hạn chưa đo.
+5. `shared_buffers` 128MB và `max_connections` 100 là mặc định của image, chưa
+   phải cấu hình chạy thật — **OPN-03** quyết cái đó.
 
 Kết luận đúng phạm vi: *ở cấu hình pool 20 trên máy phát triển, với mô hình tải
-bùng nổ, chi phí thêm của một request nằm dưới trần 50 ms* — chưa phải
-*phương án này chắc chắn đủ nhanh khi chạy thật*.
+bùng nổ, chi phí thêm của một request nằm dưới trần 50 ms trong toàn bộ 14.000
+request đã đo.* Chưa phải *phương án này chắc chắn đủ nhanh khi chạy thật*.
 
-## Việc sinh ra từ đây
+## Hai khẳng định SAI đã từng nằm trong hồ sơ này — ghi lại để không ai trích nhầm
 
-- ADR-0002 (Sửa đổi 1 + 2) có số liệu chống lưng → đủ điều kiện để chủ dự án
-  chuyển sang Accepted.
-- WMS-2: đặt pool = 20 tường minh, đo lại **qua Prisma**, và đo với nhiều bản sao.
-- OPN-03 chốt xong thì `max_connections` và số bản sao mới ra con số cuối cùng.
+1. **`r = 0,920`** từng được in trong báo cáo như một số đo của lần chạy này. Nó là
+   **viết cứng**, lấy từ một lần đo khác của R1. Tính từ chính `do-p95.json` thì
+   **r = 0,706**. Kết luận định tính vẫn đúng (những cú vọt kéo cả chờ-pool lẫn
+   truy-vấn cùng lúc, tức là cú khựng của cả máy chứ không phải hàng đợi), nhưng
+   con số cụ thể thì đừng trích.
+2. **`do-p95.json` có trường `quanSat.khongChamDia`** nói *"EXPLAIN (ANALYZE,
+   BUFFERS) … shared hit, read=0"*. **Script chưa từng chạy EXPLAIN.** Đó là một
+   khẳng định tay được nhét vào file bằng chứng. Điều nó nói thì đúng — R1 đã tự
+   chạy EXPLAIN và xác nhận `shared hit=10, read=0` — nhưng **người đo là R1 ở
+   vòng review, không phải script**. JSON được giữ nguyên byte để chuỗi kiểm chứng
+   của R1 còn giá trị; ghi cải chính ở đây thay vì sửa file.
+
+## Vì sao harness bị xoá (A6)
+
+`scripts/do-p95-phien.mjs` và `scripts/sinh-bao-cao-wms1.py` đã bị xoá. Chúng qua
+3 lần viết và 5 vòng review mà vẫn còn năm khiếm khuyết chưa vá, hai trong đó nguy
+hiểm nếu ai đó chạy lại:
+
+- **Trình sinh báo cáo nói dối trên dữ liệu TRƯỢT.** R1 nạp vào một lần chạy có
+  86,11% request vượt trần; báo cáo vẫn in *"nằm dưới trần 50 ms"* và *"đủ điều
+  kiện chuyển sang Accepted"*.
+- **2/4 lần SIGINT sớm bị lờ hoàn toàn** — không log, không thoát.
+- Script ghi vào đường dẫn bằng chứng chuẩn **vô điều kiện**, nên một lần chạy thử
+  40 mẫu đã từng thay được bằng chứng đã commit.
+- Cột "trung vị" thực ra là max của hai hồ sơ, làm lật thứ hạng pool.
+- Mô hình tải chưa bị khoá trong điều kiện của ADR: hạ tải rồi chạy lâu vẫn thoả.
+
+Muốn đo lại thì phải dựng harness mới — đó là việc đã được cân nhắc và **cố ý
+hoãn** (A6 phương án a). Toàn bộ chi tiết của 5 vòng review nằm ở
+[`dev/review.md`](dev/review.md); nó là phần đáng đọc nhất của hồ sơ này.

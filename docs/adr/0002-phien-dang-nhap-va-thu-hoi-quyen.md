@@ -1,6 +1,11 @@
 # ADR-0002 — Phiên đăng nhập lưu phía máy chủ, thu hồi quyền tức thời
 
-- **Trạng thái:** **MỞ LẠI 2026-08-19** (xem §Sửa đổi 1 và §Sửa đổi 2) — vẫn Proposed, chấp nhận là quyền của chủ dự án
+- **Trạng thái:** **ACCEPTED 2026-08-20** — chủ dự án chấp nhận qua quyết định A6,
+  sau khi WMS-1 cho con số kiểm chứng được độc lập: p95 gộp **5,2031 ms** trên
+  14.000 request, **0 request vượt trần 50 ms** (bằng chứng: `evd/WMS-1/`).
+  Điều kiện của §Sửa đổi 2 đã thoả. Quyết định tạm về kích thước pool (**20 mỗi
+  bản sao, tối đa 3 bản sao**) trở thành ràng buộc mà WMS-2 phải đặt tường minh.
+  Hai ẩn số còn lại — `max_connections` và số bản sao thật — vẫn chờ **OPN-03**.
 - **Ngày:** 19/08/2026
 - **Bối cảnh tài liệu:** SRS §2.3, §4.1 (FR-01-06, FR-01-07), §7.1 (NFR-PER-02,
   NFR-PER-05), §7.3 (NFR-SEC-01, NFR-SEC-04, NFR-SEC-08); SRD BR-22; ADR-0001
