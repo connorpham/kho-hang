@@ -1,0 +1,29 @@
+-- Kênh phụ thời gian, đo QUA HTTP trên bản build sản xuất
+-- 12 lượt mỗi nhánh · mỗi lượt một context trình duyệt riêng
+-- đo từ lúc bấm nút tới lúc thông báo lỗi hiện ra
+A · KHÔNG TỒN TẠI            trung vị = 302.2 ms  [294.6 … 805.5]
+B · sai mật khẩu · ln=16     trung vị = 300.5 ms  [296.1 … 303.2]
+B · sai mật khẩu · ln=14     trung vị = 303.1 ms  [296.4 … 304.1]
+B · sai mật khẩu · ln=12     trung vị = 302.7 ms  [298.4 … 305.1]
+C · đang bị khoá             trung vị = 300.0 ms  [297.1 … 305.6]
+D · đã vô hiệu hoá           trung vị = 302.6 ms  [295.1 … 306.5]
+
+TỈ LỆ chậm nhất / nhanh nhất = 1.01×
+
+-- Vòng ĐỒNG THỜI: 24 lượt cùng lúc mỗi nhánh
+-- (vòng tuần tự ở trên KHÔNG đủ: sàn thời gian chỉ che khi nó còn bó)
+A · KHÔNG TỒN TẠI            trung vị = 869.3 ms  [321.6 … 1003.7]
+B · sai mật khẩu · ln=16     trung vị = 877.7 ms  [843.8 … 980.0]
+B · sai mật khẩu · ln=14     trung vị = 887.8 ms  [411.6 … 930.6]
+B · sai mật khẩu · ln=12     trung vị = 914.8 ms  [839.5 … 941.6]
+C · đang bị khoá             trung vị = 905.7 ms  [870.8 … 931.4]
+D · đã vô hiệu hoá           trung vị = 877.3 ms  [350.3 … 949.2]
+
+TỈ LỆ đồng thời = 1.05×
+
+QUẦN THỂ ĐỒNG NHẤT (tham số hiện hành) — điều kiện phải ĐẠT:
+  tỉ lệ = 1.04× · hai khoảng rời nhau? không
+QUẦN THỂ LỆCH tham số — phần dư đã biết, được báo cáo:
+  tỉ lệ = 1.05× · chậm nhất "B · sai mật khẩu · ln=12" · nhanh nhất "A · KHÔNG TỒN TẠI"
+
+KẾT LUẬN: ở quần thể đồng nhất, các nhánh không tách được bằng đồng hồ — tuần tự lẫn đồng thời.

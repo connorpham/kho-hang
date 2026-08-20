@@ -1,0 +1,30 @@
+-- AC9 · NFR-SEC-03 — kiểm KHO DỮ LIỆU, không kiểm mã nguồn
+-- sinh bởi scripts/bang-chung-mat-khau.mjs (chạy trong `npm run evidence`)
+-- CSDL: stockflow_wms
+--
+-- ĐỌC CON SỐ NÀY CHO ĐÚNG: thứ được khẳng định là BẤT BIẾN "không hàng nào
+-- nằm ngoài danh sách thuật toán cho phép", KHÔNG phải mẫu số. Mẫu số tăng
+-- mỗi lượt chạy gate và các hàng đó KHÔNG xoá được — nhật ký chỉ-ghi-thêm
+-- khoá ngoại RESTRICT vào nguoi_dung (BRULE-13 / DI-07).
+
+### đếm theo tiền tố thuật toán
+$ SELECT split_part(mat_khau_hash, '$', 2) AS thuat_toan, count(*) FROM nguoi_dung GROUP BY 1 ORDER BY 2 DESC
+  {"thuat_toan":"scrypt","count":"2827"}
+
+### phân bố tham số chi phí (liên quan kênh phụ thời gian — xem REPORT §2)
+$ SELECT split_part(mat_khau_hash, '$', 3) AS tham_so, count(*) FROM nguoi_dung GROUP BY 1 ORDER BY 2 DESC
+  {"tham_so":"ln=12,r=8,p=1","count":"1871"}
+  {"tham_so":"ln=14,r=8,p=1","count":"610"}
+  {"tham_so":"ln=16,r=8,p=1","count":"346"}
+
+### có hàng nào KHÔNG khớp danh sách cho phép của NFR-SEC-03 không
+$ SELECT count(*) AS so_hang_khong_hop_le FROM nguoi_dung WHERE mat_khau_hash !~ '^\$(2[aby]\$|scrypt\$|argon2(id|i|d)\$)'
+  {"so_hang_khong_hop_le":"0"}
+
+### ràng buộc CHECK đang chặn ở tầng CSDL (WMS-2)
+$ SELECT conname, pg_get_constraintdef(oid) AS dinh_nghia FROM pg_constraint WHERE conrelid = 'nguoi_dung'::regclass AND conname LIKE '%mat_khau%'
+  {"conname":"nguoi_dung_mat_khau_phai_la_bam","dinh_nghia":"CHECK (((mat_khau_hash)::text ~ '^\\$(2[aby]\\$|scrypt\\$|argon2(id|i|d)\\$)'::text))"}
+
+### thử ghi thẳng một mật khẩu thô — CSDL phải từ chối
+$ INSERT … mat_khau_hash = 'matkhauthobanro'
+KẾT QUẢ: bị từ chối — new row for relation "nguoi_dung" violates check constraint "nguoi_dung_mat_khau_phai_la_bam"

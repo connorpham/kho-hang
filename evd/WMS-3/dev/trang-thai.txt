@@ -1,0 +1,4 @@
+02 · lỗi: máy chủ trả về "Thông tin đăng nhập không đúng, hoặc tài khoản đang tạm khoá."
+03 · đang xử lý: nút bị vô hiệu hoá, nhãn "Đang kiểm tra…"
+04 · khoá: so_lan_sai_lien_tiep=5, khoa_den_luc=2026-08-20T09:51:28.769Z — mật khẩu ĐÚNG vẫn bị từ chối
+05 · thành công: chuyển tới /; cookie phien_stockflow httpOnly=true sameSite=Lax dài=43 ký tự; document.cookie trong JS = ""; phiên trong CSDL id=aD1Dxnt3… het_han_luc=2026-08-20T09:51:29.870Z
