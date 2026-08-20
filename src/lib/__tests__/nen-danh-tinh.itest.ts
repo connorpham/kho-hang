@@ -246,7 +246,11 @@ describe('WMS-2 · ảnh chụp lược đồ — khẳng định TẬP, không 
       WHERE NOT t.tgisinternal AND c.relnamespace = 'public'::regnamespace ORDER BY 1`],
   ])('tập %s khớp ảnh chụp đã commit', async (_ten, khoa, sql) => {
     const { rows } = await db.query(sql)
-    expect(rows.map((r) => r.v)).toEqual((anhChup as Record<string, string[]>)[khoa])
+    // `ghiChu` là chuỗi, các khoá còn lại là mảng — ép thẳng sang
+    // Record<string, string[]> là nói dối kiểu, và tsc bắt đúng. Lấy đúng mảng.
+    const mong = (anhChup as unknown as Record<string, unknown>)[khoa]
+    expect(Array.isArray(mong)).toBe(true)
+    expect(rows.map((r) => r.v)).toEqual(mong)
   })
 })
 
