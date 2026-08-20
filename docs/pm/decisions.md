@@ -85,7 +85,7 @@ và nạp `docs/pm/plan.yaml` sprint-1 (5.5/8.0 pd):
 | Ticket | Việc | pd | DoR hiện tại |
 |---|---|---|---|
 | WMS-1 | Đo p95 lượt đọc phiên (điều kiện chốt ADR-0002) | 0.5 | ⛔ **hỏng lần 3** → **A6** (câu hỏi phạm vi). Con số đã có và kiểm chứng được; harness thì chưa. Trước đó: hỏng 2/2 lần — vòng 2: R2 APPROVE, R1 REQUEST-CHANGES (MỚI-1). Đã leo lên **A4** ở §2; máy không tự chọn lại |
-| WMS-2 | Nền danh tính NguoiDung/VaiTro/Kho/Phien + migration | 1.5 | ❌ chờ WMS-1 |
+| WMS-2 | Nền danh tính NguoiDung/VaiTro/Kho/Phien + migration | 1.5 | ⛔ **failed lần 1/2** — vòng review 3 người: R1 APPROVE, R2 APPROVE, **R3 REQUEST-CHANGES**. Diff high-stakes cần đủ 3 chữ ký. Sản phẩm được R1 và R2 kiểm độc lập và duyệt; thứ còn thiếu là **hàng rào test**, không phải khuyết tật lược đồ. Còn 5 việc rẻ và cụ thể ở `evd/WMS-2/dev/review.md` §Vòng 2. Còn một lần thử tự chọn trước loop guard #3 |
 | WMS-3 | S-01 đăng nhập + khoá tạm | 1.5 | ❌ chờ WMS-2 · thiếu oracle thiết kế (G-04) · nội dung thông báo chờ G-01 |
 | WMS-4 | S-02 chọn kho làm việc | 1.0 | ❌ chờ WMS-2, WMS-3 · thiếu oracle (G-04) · chờ G-03 |
 | WMS-5 | S-03 hết phiên 30 phút | 0.5 | ❌ chờ WMS-2, WMS-3 · thiếu oracle (G-04) |
