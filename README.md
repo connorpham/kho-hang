@@ -27,6 +27,16 @@ cp .env.example .env      # rồi điền giá trị thật
 
 ### Cơ sở dữ liệu
 
+> ⚠️ **Hai cách dưới đây LOẠI TRỪ NHAU.** Chạy cả hai thì cả hai cùng đòi cổng
+> 5432, và bind loopback của Homebrew **thắng** bind wildcard của container — mọi
+> kết nối `@localhost:5432` sẽ rơi vào Homebrew trong khi bạn tưởng đang dùng
+> container. `SELECT 1` xanh với cả hai nên không có gì báo động. Đã có một phiên
+> chạy toàn bộ migration nhầm server vì đúng chuyện này ([KI-003](docs/qa/known-issues.md)).
+> Kiểm bằng `lsof -nP -iTCP:5432 -sTCP:LISTEN` (thấy hai tiến trình là đã sai) và
+> `bash .vteam/db-check.sh` (nay in tên server + database).
+>
+> **SRS §2.3 yêu cầu triển khai dạng container, nên Cách 1 là đường mặc định.**
+
 Cách 1 — container (khớp yêu cầu triển khai của SRS §2.3):
 
 ```bash
@@ -161,8 +171,14 @@ Ticket đi qua **Jira** (`project.key = WMS`), nên Jira project phải có key 
       (BRULE-13) và phân vùng theo tháng.
 - [ ] **Chưa có xác thực/phân quyền** (SC-20 và ma trận RBAC).
 - [ ] **Chưa có Dockerfile** cho app (`output: 'standalone'`) — thuộc DevOps.
-- [ ] **Chưa có `test:integration` / `test:e2e`** — hai bước `tail` của gate sẽ
-      lỗi nếu gọi `npm run gate e2e`.
+- [x] ~~`test:integration`~~ — có từ WMS-2 (`vitest.integration.mts`, 27 test trên
+      PostgreSQL thật). **Nhưng CI chưa chạy nó**: `vteam-gate.yml` không khai báo
+      service Postgres nào, và bước `integration` là bước `tail` nên
+      `gate.sh` không tham số bỏ qua nó. Đường duy nhất chạm tới là `gate e2e`, mà
+      đường đó vẫn đỏ vì `test:e2e` chưa tồn tại.
+- [ ] **Chưa có `test:e2e`** — chưa có màn hình nào để chạy.
+- [ ] **CI chưa áp migration lên Postgres trắng.** Với repo mà `prisma/migrations/`
+      là high-stakes path, đây là bước rẻ nhất còn thiếu.
 - [x] ~~JIRA_BASE_URL~~ — xong 2026-08-19, preflight xanh cả 7 chân.
 - [ ] **Chưa có ticket nào trong Jira** (`project = WMS` trả về 0). Backlog là
       việc kế tiếp của BA: shard → user story → gate B4.
