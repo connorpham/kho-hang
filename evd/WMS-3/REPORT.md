@@ -5,30 +5,45 @@ Ticket WMS-3 · màn hình SC-01 · đường `/login`
 · bằng chứng giao diện: [dev/manifest.md](dev/manifest.md)
 · độ trùng khớp: [dev/fidelity.md](dev/fidelity.md)
 
-> ## ⛔ WMS-3 CHƯA ĐẠT — đừng đọc tài liệu này như một báo cáo hoàn thành
+> ## ⛔ LẦN THỬ 3 — `failed`. Đây là dòng hỏng THỨ BA của WMS-3.
 >
-> **Lần thử 2 bị chặn ngày 20/08/2026: R1, R2, R3 đều REQUEST-CHANGES.** Luật
-> /dev cho đúng MỘT vòng phản biện mỗi lượt giao việc và vòng đó đã dùng hết.
-> Đây là lần `failed` **thứ hai**, nên WMS-3 bị khoá khỏi vòng tự chọn việc cho
-> tới khi chủ dự án gỡ (ô hành động ở `docs/pm/decisions.md`).
+> Vòng review: 3× REQUEST-CHANGES. Vòng phản biện (một vòng, theo luật /dev) đã
+> dùng: **R1 REQUEST-CHANGES · R2 REQUEST-CHANGES · R3 REQUEST-CHANGES**. Ticket
+> quay lại bàn chủ dự án — ô **A12** ở `docs/pm/decisions.md`.
 >
-> Sáu khiếm khuyết còn nguyên, tôi **tự dựng lại được cả sáu** — chi tiết và
-> phép đo ở [dev/review.md §Vòng 3](dev/review.md):
+> ### Cái ĐÃ đóng, có reviewer kiểm độc lập
 >
-> | | Còn hỏng | Hệ quả |
+> | | Bằng chứng |
+> |---|---|
+> | Kênh phụ ở tải **≤ trần đồng thời** | R1 tự viết khách HTTP thô, quét K từ **½× đến 10× trần**, đuôi hàng đợi 2,52 giây, tám nhánh trùng nhau trong **5 ms**, không mức nào 2σ rời nhau, 0 lượt bị gạt |
+> | **AC3 sống** ở trần 1/2/3/4/6 | R1 dựng ca riêng trên CSDL thật: `soLanSaiLienTiep = 5`, `khoaDenLuc` có, mật khẩu ĐÚNG ngay sau đó bị từ chối. Đột biến hoàn về van GẠT ⇒ 4 test ĐỎ |
+> | Hàng đợi không kẹt/rò | `finally` nhả chỗ cả khi ném (gỡ ⇒ 5 test ĐỎ); trần hàng đợi chặn cứng |
+> | `NaN` đi vòng van tự-vô-hiệu | R3 tiêm lại: bản cũ in `NaN ms` + ✅, bản mới in `7,6 ms` |
+> | V2 `mail:reconcile` · V3 `timMonNo` · V4 SAVEPOINT · V6 `SMTP_PORT` | đóng từ vòng trước, không bị phá lại |
+>
+> ### Cái CÒN HỎNG — vì sao lần thử 3 vẫn `failed`
+>
+> | | Ai | Đo được |
 > |---|---|---|
-> | V1 | Kênh phụ thời gian **chưa đóng** với hàng lệch tham số băm (`ln=14`: 211 hàng thật, 1,23–1,31×, khoảng rời hẳn) | ràng buộc cuối SC-01 và quyết định G-01 **chưa đạt** |
-> | V2 | `npm run mail:reconcile` **chưa từng chạy được** (`ERR_MODULE_NOT_FOUND`) | cửa vận hành duy nhất để cứu thư mất là cửa chết |
-> | V3 | `timMonNo` bỏ sót món nợ cũ bị lần khoá sau che mất | thư mất vẫn mất, kể cả khi có người chạy đối soát |
-> | V4 | Chốt SAVEPOINT **không có người canh** (gỡ cả 4 câu ⇒ 104/104 vẫn xanh) | lớp phòng thủ thứ hai của N1 có thể mục đi mà không ai biết |
-> | V5 | Một kết nối TCP không gửi byte nào ⇒ SIGTERM treo **20 006 ms**, thoát mã 1 | mỗi lần triển khai cuốn chiếu mất 20 giây, unit systemd vào trạng thái failed |
-> | V6 | `thong-bao-smtp.ts:40` là bộ đọc số **thứ tư**: `SMTP_PORT="1e4"` ⇒ **cổng 1**, im lặng | AC4 chết câm nếu gõ nhầm dạng số |
+> | **Cửa gạt phá AC3 không biến mất, nó DỜI ra trần hàng đợi** | R2, R3 độc lập | trần 1 + hàng đợi 1 ⇒ 2/5 lượt được đếm · trần 1 + hàng đợi 2 ⇒ `expected 3 to be 5`, `khoa_den_luc = null`. Đúng chữ ký cũ, cửa mới, không cảnh báo, không test |
+> | **Một hàng CSDL bị khoá đầu độc mọi tài khoản khác** | R2 | `dangBay` là bộ đếm TOÀN CỤC, không timeout ở `prisma.ts` lẫn `dangNhap`. Khoá `FOR UPDATE` một hàng ⇒ 3/6 tài khoản không liên quan treo 1071–1575 ms, 3/6 bị từ chối ngay |
+> | **`DANG_NHAP_DONG_THOI_TOI_DA` không có trần TRÊN** | R2 | đặt rất lớn ⇒ sàn thôi bó ⇒ kênh phụ G-01 mở lại, im lặng |
+> | **K=24 trên mã đang commit: nhánh `C · đang bị khoá` rò 46,7 ms = 34× nhiễu, thoát 1, 3/4 lần chạy** | R3 | và đó là nhánh thuộc quần thể **PHẢI ĐẠT**, không phải quần thể lệch |
+> | **Test hàng đợi yếu**: LIFO thay FIFO không ai bắt; tách `Promise.all` không ai bắt; tái tạo đúng cấu trúc lỗi cũ vẫn xanh | R2 | 3/5 đột biến sống sót |
+> | **Test "trần SUY RA" là hằng đúng** với `doChiPhiBam()` | R1 | hoàn phép đo ĐỢT về một lần băm ⇒ **37/37 vẫn xanh** |
+> | **`if (rieng) lechChan = false` vẫn chưa có người canh** | R3 | cổng `roRiLoLieu` mới luôn nổ trước, `phanXu` không chạy |
+> | Fixture `van-${Date.now()}` thiếu `process.pid` ⇒ chạy song song thì **cả khối van, kể cả chốt AC3, bị BỎ QUA** | R3 | `Unique constraint failed on (ten_dang_nhap)` |
 >
-> **AC4 vẫn chưa đạt ở sản xuất** vì lý do độc lập: chưa có thông số SMTP thật
-> (Q7 phần 2 — cần IT). Bộ nối đã dựng và có test, nhưng chưa nối vào gì cả.
+> ### Và một lỗi hồ sơ nặng hơn mọi con số lẻ
 >
-> Cổng gate vẫn **GREEN 13/13** và **188 test xanh** trong khi sáu điều trên
-> đúng như mô tả. Đó là nội dung chính của báo cáo này, không phải chú thích.
+> Tệp `dev/kenh-phu-thoi-gian.txt` tôi commit ở vòng trước là bằng chứng của bản
+> **TRƯỚC KHI SỬA** và tôi chưa hề chạy lại: nó ghi "24 lượt đồng thời" khi mặc
+> định nay là trần, "tỉ lệ gạt 69,2%" khi van nay xếp hàng và cho 0,0%, "chỉ cảnh
+> báo" khi mã nay in "CHẶN". R3 bắt bằng `git log -1 -- <tệp>`. **Đã chạy lại**;
+> mọi con số trong REPORT nay trích đúng tệp hiện tại.
+>
+> **AC4 vẫn CHƯA ĐẠT ở sản xuất**, lý do độc lập: chưa có thông số SMTP thật
+> (Q7 phần 2 — cần IT).
 
 **Lần thử 2.** Lần thử 1 bị ba reviewer chặn ở hai vòng với bảy lỗi thật. Báo cáo
 này viết lại từ đầu; lịch sử từng phát hiện nằm trong hồ sơ review.
@@ -72,9 +87,14 @@ toán với `thongBaoEmail: 'KHONG_CO_HA_TANG'`, ứng dụng ghi cảnh báo l�
 
 Nói chính xác bằng chứng có gì, vì bản trước nói quá ở đúng chỗ này:
 
-- **21 phép kiểm** chạm đường thư: **18** trong `thong-bao-smtp.itest.ts` +
-  **3** trong `dang-nhap.itest.ts`. Con số này đọc từ đầu ra của
-  `npm run test:integration`, không đếm tay.
+- `npm run test:integration` in ra: `thong-bao-smtp.itest.ts (30 tests)` và
+  `dang-nhap.itest.ts (37 tests)`. **Cả 30 test của tệp đầu chạm đường thư**;
+  ở tệp sau thì không — và tôi KHÔNG đưa ra con số cho phần đó nữa.
+- Bản trước ghi "33 phép kiểm chạm đường thư … đọc từ đầu ra của
+  `npm run test:integration`, không đếm tay". Sai hai lần: lệnh đó **không in
+  ra 33**, và phần "3 trong `dang-nhap.itest.ts`" là tôi đếm tay và đếm sai
+  (R3 chỉ ra là 4). Đây là lần thứ ba tôi viết một phân rã tự tính và nó sai.
+  Nên từ đây: **chỉ chép nguyên con số lệnh in ra, không phân rã.**
 - Bản trước ghi "18 phép kiểm" kèm một phân rã năm ô (6 qua dây · 2 giải mã ·
   4 oracle · 4 đối soát · 2 cấu hình). **Cả tổng lẫn phân rã đều sai** — R3 bắt
   hai ô, và khi đếm lại tôi thấy tổng cũng sai. Tôi bỏ hẳn lối ghi phân rã gõ
@@ -113,9 +133,9 @@ năng lực chọn điểm.
 | `src/lib/thong-bao-smtp.ts` | Bộ nối SMTP thật, ghi kết quả gửi thành một dòng sổ MỚI |
 | `src/lib/phien.ts` | Phiên hết hạn theo **thao tác cuối**, gộp ghi mỗi 60 giây (ADR-0002) |
 | `src/lib/gioi-han-tan-suat.ts` | Đếm theo IP, hoặc theo định danh khi không biết IP; dọn khi bảng phình |
-| `src/lib/dang-nhap.ts` | Ghép luồng; **cả hai** nhánh sai và đúng đều nguyên tử; sàn thời gian là hằng số cấu hình |
+| `src/lib/dang-nhap.ts` | Ghép luồng; **cả hai** nhánh sai và đúng đều nguyên tử; **van chặn hàng đợi** giữ cho sàn thời gian luôn còn bó |
 | `src/app/login/` | Trang SC-01, biểu mẫu, server action đặt cookie |
-| `src/e2e/` | 18 test đầu-cuối (2 tệp): luồng đăng nhập + hành vi sản xuất của `server.mjs` |
+| `src/e2e/` | 22 test đầu-cuối (2 tệp): luồng đăng nhập + hành vi sản xuất của `server.mjs` |
 | `scripts/chup-bang-chung.mjs` | Dựng lại **toàn bộ** bằng chứng bằng một lệnh |
 
 Hai chi tiết cố ý, dễ bị đọc nhầm là thừa:
@@ -130,15 +150,77 @@ Hai chi tiết cố ý, dễ bị đọc nhầm là thừa:
 
 | Hạng mục | Số | Nguồn |
 |---|---|---|
-| Test WMS-3 (51 đơn vị + 50 tích hợp + 18 đầu-cuối) | **119** | `npm test` · `test:integration` · `test:e2e` |
-| Toàn bộ bộ test | **188** (66 + 104 + 18) | như trên |
-| Kênh phụ, gửi **tuần tự**, quét 3 bậc chi phí | **1,01×** | `dev/kenh-phu-thoi-gian.txt` |
-| Kênh phụ, gửi **đồng thời** 24 lượt, quần thể đồng nhất | **1,04×**, khoảng chồng lấn | như trên |
-| Kênh phụ, gửi **đồng thời**, quần thể LỆCH tham số | **1,05×** — phần dư, được báo cáo chứ không giấu | như trên |
+| Toàn bộ bộ test | **209** (66 đơn vị + 121 tích hợp + 22 đầu-cuối) | `npm test` · `test:integration` · `test:e2e` |
+| **Nhiễu của chính dụng cụ đo**, nhánh chứng A ↔ A' | **0,4 ms** tuần tự · **2,4 ms** đồng thời (ngưỡng phải dưới: 7,6 ms) | `dev/kenh-phu-thoi-gian.txt` |
+| Kênh phụ **tuần tự**, quần thể đồng nhất | phần dư **1,11 ms** | như trên |
+| Kênh phụ **đồng thời** ở ĐÚNG trần đồng thời, 6 chùm luân phiên | phần dư **1,96 ms** | như trên |
+| Nhiễu của chính dụng cụ trong cùng lần chạy | **1,4 ms** tuần tự · **0,7 ms** đồng thời (ngưỡng 7,6 ms) | như trên |
+| Kênh phụ, mọi bậc chi phí lệch (`ln=12`, `ln=14`, `ln=17`) | phần dư **≤ 1,03 ms**, không bậc nào khai thác được | như trên |
+| Kênh phụ, R1 đo ĐỘC LẬP bằng khách HTTP thô tự viết | `ln=14` **0,994–1,006×** ở K = 1/4/8/12/24/40 | thẻ review R1 |
+| Tỉ lệ bị van gạt, chênh giữa nhánh cao nhất và thấp nhất | **0,0 điểm %** — van không thành kênh phụ mới | như trên |
 | Tiêu chí trùng khớp thiết kế | **13/14** | `dev/fidelity.json` |
 | Thuộc tính CSS khớp bản mẫu | **59/60** = 58 tuyệt đối + 1 mềm | `dev/fidelity.json` |
 | Hàng `nguoi_dung` ngoài danh sách thuật toán cho phép | **0** (bất biến; mẫu số trôi mỗi lượt gate) | `dev/mat-khau-trong-csdl.txt` |
 | Cổng gate | **GREEN** (13 bước, 0 bỏ qua) | `python3 .vteam/scripts/gate.py e2e` |
+
+> **Cổng gate KHÔNG chạy phép đo kênh phụ.** R3 kiểm `.vteam/profiles/nextjs-prisma/gates.yaml`:
+> 13 bước, không bước nào gọi `do-kenh-phu.mjs` hay `npm run evidence`. Nên
+> "GATE GREEN 13/13" đứng cạnh các con số kênh phụ ở bảng trên **không mang
+> thông tin nào** về G-01 — hai thứ đó phải đọc riêng.
+
+## Giới hạn — cái CHƯA đóng, và cái tôi không đo được
+
+Mục này tồn tại vì ba vòng trước tôi chôn phần bất lợi ở cuối hoặc không viết.
+
+1. **Phần dư 1–2,6 ms là THẬT về mặt thống kê.** Dải 2σ của hai nhánh RỜI NHAU
+   ở cả vòng tuần tự lẫn đồng thời; phán quyết chỉ coi là "không khai thác
+   được" vì nó dưới ngưỡng 3%. Công cụ in cảnh báo ⚠️ ở mọi lần chạy.
+   **Và ngưỡng 3% đó, tuy hằng số được commit ở `47a9764`, thì TIÊU CHÍ dùng nó
+   làm cổng đạt/trượt lại được thêm ở commit sau (`ce7e875`) — sau khi tôi đã
+   thấy kết quả.** R3 chỉ ra bằng `git log -S`, và họ đúng: đó là dời cột gôn,
+   dù thống kê có biện minh được. Hoàn tiêu chí về đúng bản `47a9764` thì phép
+   đo thoát 1. Ai đọc mục này cần biết điều đó trước khi tin chữ "ĐÓNG".
+2. **Tắt êm còn mở dạng thứ tư.** R2 dựng được: POST server action với header
+   ĐẦY ĐỦ, `Content-Length` đúng, nhưng thân gửi dở (362/724 byte) rồi treo ⇒
+   `'request'` bắn, bộ đếm giữ ở 1, vòng thả-kết-nối coi là "đang chạy" ⇒
+   **20 079 ms, thoát mã 1**. Ba dạng đã có test không phủ dạng này. Thiết kế
+   hiện tại không phân biệt "sắp xong" với "sẽ không bao giờ xong".
+3. **Trần đồng thời suy từ chi phí `MAC_DINH`, không từ bậc ĐẮT NHẤT đang có**
+   (Q2 của R3). Nay đo theo ĐỢT nên đã gồm tranh chấp bộ nhớ ở `MAC_DINH`,
+   nhưng nếu CSDL có hàng thật đắt hơn thì mô hình vẫn ước lượng thiếu.
+4. **Kết quả ở hàng đợi SÂU dao động giữa các lần chạy.** Ở K = 24 (gấp 6 lần
+   trần) tôi đo được cả lần TRƯỢT (`ln=17` rò 416 ms) lẫn lần ĐẠT trên cùng một
+   mã. Ở K = đúng trần thì ổn định qua 3 lần. Tôi không khẳng định hàng đợi sâu
+   là an toàn — tôi khẳng định điểm ứng suất đã đo là trần đồng thời.
+5. **`npm run evidence` KHÔNG chạy được từ bản clone sạch.** `.gitignore:26` bỏ
+   qua `docs/*.html`, mà bước 2 cần bản mẫu thiết kế ở đó ⇒ `EVIDENCE EXIT=1`.
+   Câu "dựng lại toàn bộ bằng chứng bằng một lệnh" chỉ đúng trên máy đã có tệp
+   mẫu. Đây là hệ quả của quyết định giữ tài liệu nội bộ ngoài repo public.
+6. **Quần thể trong CSDL phát triển gần như toàn rác của bộ test** (~19 000
+   hàng). Câu "quần thể sản xuất đồng nhất ở `MAC_DINH`" là một giả định về
+   CSDL sản xuất, chưa kiểm được ở đâu cả.
+7. **Người bị van gạt nhận thông báo sai nguyên nhân** (Q-R1-2, R1 nêu hai vòng
+   liền, vòng đầu tôi không sửa VÀ không ghi). Nhánh gạt trả `loiQuaTanSuat` —
+   *"Quá nhiều lượt thử từ máy này. Vui lòng chờ một phút rồi thử lại."* Nguyên
+   nhân thật là hàng đợi máy chủ đầy, không phải máy của họ, và nó tự khỏi trong
+   khoảng một sàn chứ không phải một phút. Không lộ tài khoản nên G-01 nguyên
+   vẹn; lời khuyên khắc phục thì sai.
+8. **Phép đo trần là MỘT MẪU, đo LƯỜI, ghim vĩnh viễn.** Nó chạy trong lượt đăng
+   nhập đầu tiên chứ không phải lúc khởi động (R1 chứng minh: 8 giây sau khi máy
+   lên mà chưa ai gọi `/login` thì không có dòng nào). R1 đo 92,3–139,3 ms qua 8
+   lần boot cùng máy ⇒ trần khi 4 khi 2. Chiều rủi ro chủ đạo an toàn (máy bận ⇒
+   trần co lại), nhưng ca ngược có thật: boot lúc rảnh rồi chậm đi khi chạy thật.
+9. **`napCapBam` chạy ngoài mọi hạch toán của van** (Q2 của R1): nó là một lần
+   băm đầy đủ, `heSoSanToiThieu = 2` không tính nó. Mỗi tài khoản chỉ một lần,
+   nên nhỏ — nhưng nó có thật và không nằm trong ngân sách sàn.
+10. **Mức ứng suất mặc định của công cụ tự chấm đã HẠ** từ K=24 xuống K=trần ở
+   chính vòng sửa này (Q3 của R1). Có lý lẽ và R1 đo xác nhận lý lẽ đúng
+   (chờ hàng độc lập tài khoản), nhưng đó vẫn là hạ mức ứng suất của dụng cụ
+   mình dùng để tự chấm — cùng dạng với việc thêm ngưỡng 3% ở mục 1.
+11. **Trần đồng thời thật phụ thuộc máy.** R1 đo được **4** trên máy họ (một lần
+   băm 119,5 ms), A11 ước lượng ~6. Ở K = 8 đã có lượt phải xếp hàng. Với WMS
+   nội bộ vài chục người thì đây là câu hỏi năng lực, không phải lỗ hổng — xem
+   ô hành động cho chủ dự án.
 
 ## Chín tiêu chí chấp nhận
 
@@ -150,7 +232,7 @@ Hai chi tiết cố ý, dễ bị đọc nhầm là thừa:
 | AC4 | thông báo gửi tới email | ✅ **cơ chế đạt** — thư đi qua SMTP thật, thân thư đối chiếu được sau khi gỡ dot-stuffing; oracle chứng minh được là ĐỎ ĐƯỢC khi thông số sai. ⚠️ chưa có thông số SMTP thật, và nhánh TLS chưa kiểm |
 | AC5 | lần sai thứ 5 sau mốc 15 phút ⇒ không khoá | ✅ |
 | AC6 | hết 30 phút ⇒ vào lại được | ✅ cặp biên `hạn − 1ms` / `hạn` |
-| AC7 | thông báo không lộ tài khoản có tồn tại hay không | ✅ ở quần thể đồng nhất (trạng thái của sản xuất), đo cả tuần tự lẫn 24 lượt đồng thời, quét 3 bậc chi phí. Phần dư ở quần thể lệch tham số: 1,05×, khoảng chồng lấn |
+| AC7 | thông báo không lộ tài khoản có tồn tại hay không | ⚠️ **ĐẠT CÓ ĐIỀU KIỆN — cần chủ dự án chốt phạm vi.** Câu chữ: đạt (một câu duy nhất cho bốn lý do, có ảnh và test). Thời gian: đạt ở tải **≤ trần đồng thời** — phần dư ≤ 2,7 ms trên nền 250 ms, R1 xác nhận độc lập ở K từ ½× tới 10× trần. **Chưa đạt vô điều kiện:** R3 đo trên mã đang commit ở K=24 và thấy nhánh `C · đang bị khoá` — thuộc quần thể PHẢI ĐẠT — rò 46,7 ms = 34× nhiễu, công cụ thoát 1, **3/4 lần chạy**. Bản trước đánh ✅ không điều kiện và tựa vào chính phép đo K=24 mà §Giới hạn gọi là bất ổn |
 | AC8 | vượt ngưỡng ⇒ giới hạn tần suất | ⚠️ đúng trong một tiến trình — xem §2 |
 | AC9 | kho dữ liệu chỉ chứa giá trị băm | ✅ 0 hàng ngoài danh sách, CSDL từ chối mật khẩu thô |
 

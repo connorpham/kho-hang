@@ -16,7 +16,7 @@ liệu", nên trạng thái này được chụp ở phía bên kia của luồn
 | AC1 · đúng tên đăng nhập ⇒ có phiên | test tích hợp `dang-nhap.itest.ts` — "đúng TÊN ĐĂNG NHẬP + mật khẩu đúng" |
 | AC2 · đúng email nội bộ ⇒ có phiên | `05_sau_khi_dang_nhap_thanh_cong.png` (đăng nhập bằng email) + `trang-thai.txt` dòng 05 |
 | AC3 · sai lần thứ 5 trong 15 phút ⇒ khoá 30 phút | `04_tai_khoan_dang_bi_khoa.png` + `trang-thai.txt` dòng 04 |
-| AC4 · thông báo gửi tới email khi bị khoá | `thong-bao-smtp.itest.ts` (18) + `dang-nhap.itest.ts` (3) — thư đi qua máy chủ SMTP thật dựng trong tiến trình. **AC4 CHƯA ĐẠT ở sản xuất**: chưa có thông số SMTP thật (Q7 phần 2) |
+| AC4 · thông báo gửi tới email khi bị khoá | `thong-bao-smtp.itest.ts` — `npm run test:integration` in ra **30 tests** cho tệp này, cả 30 chạm đường thư; thư đi qua máy chủ SMTP thật dựng trong tiến trình. **AC4 CHƯA ĐẠT ở sản xuất**: chưa có thông số SMTP thật (Q7 phần 2). *(Bản trước ghi "18 + 3" và khai là đọc từ đầu ra lệnh — lệnh chưa bao giờ in 18; R3 bắt.)* |
 | AC5 · lần sai thứ 5 sau mốc 15 phút ⇒ KHÔNG khoá | test tích hợp — "lần thứ năm SAU cửa sổ 15 phút" |
 | AC6 · hết 30 phút ⇒ đăng nhập lại được | test tích hợp — "hết 30 phút… cặp biên" |
 | AC7 · thông báo không lộ tài khoản có tồn tại hay không | `02_tu_choi_sai_mat_khau.png` + `04_…png` — cùng câu chữ **và** cùng thời gian |
@@ -24,7 +24,7 @@ liệu", nên trạng thái này được chụp ở phía bên kia của luồn
 | AC9 · kho dữ liệu chỉ chứa giá trị băm | `mat-khau-trong-csdl.txt` (truy vấn SQL trực tiếp) |
 | Trạng thái rỗng (mới mở trang) | `01_man_dang_nhap_trang_thai_rong.png` |
 | Trạng thái đang xử lý (nút vô hiệu hoá) | `03_dang_xu_ly.png` |
-| AC7 · thời gian đáp không phân biệt được bốn lý do | `kenh-phu-thoi-gian.txt` — đo qua HTTP, **cả tuần tự lẫn 24 lượt đồng thời** |
+| AC7 · thời gian đáp không phân biệt được bốn lý do | `kenh-phu-thoi-gian.txt` — đo qua HTTP bằng khách thô, tuần tự và **ở ĐÚNG trần đồng thời** (mặc định của công cụ nay là trần, không phải 24). **Điều kiện, chưa vô điều kiện** — xem `REPORT.md` §Giới hạn và ô AC7 |
 | Độ trùng khớp với bản mẫu | `design_vs_app.png` + `fidelity.md` + `fidelity.json` |
 
 **Ảnh PNG không nằm trong repo** — `.gitignore` giữ bằng chứng dạng chữ và bỏ

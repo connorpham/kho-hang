@@ -3,7 +3,7 @@
   "manHinh": "SC-01",
   "duong": "/login",
   "banMau": "docs/StockFlow-WMS-20-screens.html (oracle G-04)",
-  "ungDung": "http://127.0.0.1:63891/login",
+  "ungDung": "http://127.0.0.1:53623/login",
   "khung": {
     "width": 1440,
     "height": 900

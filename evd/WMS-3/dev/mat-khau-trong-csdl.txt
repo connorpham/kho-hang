@@ -9,13 +9,14 @@
 
 ### đếm theo tiền tố thuật toán
 $ SELECT split_part(mat_khau_hash, '$', 2) AS thuat_toan, count(*) FROM nguoi_dung GROUP BY 1 ORDER BY 2 DESC
-  {"thuat_toan":"scrypt","count":"2827"}
+  {"thuat_toan":"scrypt","count":"43927"}
 
 ### phân bố tham số chi phí (liên quan kênh phụ thời gian — xem REPORT §2)
 $ SELECT split_part(mat_khau_hash, '$', 3) AS tham_so, count(*) FROM nguoi_dung GROUP BY 1 ORDER BY 2 DESC
-  {"tham_so":"ln=12,r=8,p=1","count":"1871"}
-  {"tham_so":"ln=14,r=8,p=1","count":"610"}
-  {"tham_so":"ln=16,r=8,p=1","count":"346"}
+  {"tham_so":"ln=16,r=8,p=1","count":"22382"}
+  {"tham_so":"ln=12,r=8,p=1","count":"9786"}
+  {"tham_so":"ln=14,r=8,p=1","count":"6010"}
+  {"tham_so":"ln=17,r=8,p=1","count":"5749"}
 
 ### có hàng nào KHÔNG khớp danh sách cho phép của NFR-SEC-03 không
 $ SELECT count(*) AS so_hang_khong_hop_le FROM nguoi_dung WHERE mat_khau_hash !~ '^\$(2[aby]\$|scrypt\$|argon2(id|i|d)\$)'

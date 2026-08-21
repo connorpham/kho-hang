@@ -338,3 +338,101 @@ hỏi cho BA về phạm vi FR-01-08) · Q-γ `MAC_DINH` xuất ra dạng ghi đ
 R2 · Q1 lượt ghi lại `diaChiIp: null` không được bọc SAVEPOINT · Q2
 `canhBaoQuaRong` im lặng với `192.168.0.0/16` và với mọi dải IPv6 rộng ·
 Q3 `KEEP_ALIVE_MS` không có trần.
+
+---
+
+# Lần thử 3 — phạm vi do chủ dự án chốt ở A11(a), 21/08/2026
+
+Loop guard #3 được gỡ cho ĐÚNG một lần thử. Phạm vi chốt sẵn, không phải một bản
+vá nữa do tôi tự nghĩ ra rồi tự chấm.
+
+**Thứ tự làm có chủ ý: sửa DỤNG CỤ ĐO trước, mã sản phẩm sau.**
+
+## Dụng cụ đo — `scripts/do-kenh-phu.mjs` viết lại (commit `47a9764`)
+
+| Đổi gì | Vì sao | Đo được |
+|---|---|---|
+| Bỏ Chromium, gọi thẳng server action bằng multipart thô | nhiễu dụng cụ 682 ms vs tín hiệu 8–164 ms; kẻ tấn công dùng `curl` | khoảng nhánh A: 682 ms → **dưới 3 ms** |
+| Nhánh chứng A' y hệt A; nhiễu ≥ hiệu ứng ⇒ **thoát 2 = VÔ HIỆU** | PASS chỉ có nghĩa khi dụng cụ đủ phân giải (KI-005) | van này **đỏ ngay lần chạy đầu**, bắt đúng chi phí khởi động |
+| Hâm nóng trước khi đo | nhánh đo ĐẦU TIÊN rộng 103,4 ms, nhánh chứng ngay sau chỉ 3,0 ms | chi phí khởi động hết bị tính thành tín hiệu |
+| Luân phiên nhánh thay vì đo trọn từng nhánh | trôi hệ thống thành tín hiệu giả cho nhánh đo sau | lệch trung vị A↔A': **0,3–0,4 ms** |
+| Đơn vị mẫu = trung vị MỘT CHÙM, 6 chùm luân phiên | gộp 72 mẫu thô ⇒ vị trí trong chùm lấn át tín hiệu | dải 2σ: 37,8 ms → **8,2 ms** |
+| Tiêu chí tách = dải 2σ **và** ≥ 3% ⚠️ **HẰNG SỐ commit ở `47a9764`, nhưng TIÊU CHÍ dùng nó làm cổng thì thêm ở `ce7e875` — SAU khi thấy kết quả.** R3 chỉ ra bằng `git log -S`, và họ đúng: đó là dời cột gôn. Hoàn về bản `47a9764` thì phép đo thoát 1. Công cụ nay in CẢ HAI phán quyết ở mọi lần chạy | p10/p90 với n=6 thoái hoá về max; 0,3% "có ý nghĩa thống kê" mà vô nghĩa vận hành | phần dư dưới ngưỡng vẫn **được in ra mọi lần chạy** |
+| Đọc bậc chi phí **từ CSDL**, cộng một bậc trên `MAC_DINH` | bản cũ cắm cứng mảng ⇒ reviewer thêm một dòng là công cụ tự tuyên chưa đạt | quét đúng `ln=12` 2386 · `ln=16` **454** · `ln=14` 213 · `ln=17` tổng hợp *(bản trước ghi 432 — gõ sai một chữ số trong một dòng chép máy; R3 bắt bằng cách so với `kenh-phu-thoi-gian.txt:3`)* |
+| Suy "hiện hành" từ `MAC_DINH`, không so chuỗi | danh sách chặn hai chuỗi ⇒ mọi bậc MỚI tự rơi vào rổ phải-đạt | — |
+| Bậc lệch tham số **CÓ HÀNG THẬT thì CHẶN**, không chỉ báo cáo | tôi tự bắt: tắt van, K=8, công cụ IN "khai thác được? CÓ" rồi vẫn thoát 0 | đột biến nay cho **thoát 1** |
+| Loại tài khoản do chính công cụ tạo khỏi phép đếm hàng | không thì "số hàng thật" là số của tôi, không phải của quần thể | 3308 → 2386 |
+
+**Dụng cụ tự bác bỏ được.** ⚠️ **CÂU CŨ Ở ĐÂY ĐÃ RÚT** — bản trước ghi "K=8 ⇒
+thoát 1, bắt `ln=17` rò 118,04 ms; K=24 ⇒ thoát 2". Con số có thật nhưng của một
+trạng thái mã CŨ HƠN (trước bộ lọc `kp-%`); ở bản đã commit khi đó nó thoát **0**,
+và R3 chứng minh nhánh chặn là mã chết. REPORT đã rút câu này cùng ngày, còn đây
+là **bản sao thứ hai tôi quên sửa** — lần thứ tư trong dự án này tôi sửa một
+trong nhiều bản sao của cùng một câu.
+Số ĐÚNG, đo trên mã hiện tại: hoàn V1c (`<` → `!==`) ⇒ `RÒ RỈ LỘ LIỄU`, **thoát 1**.
+
+## Mã sản phẩm (commit `ce7e875`)
+
+| # | Sửa gì | Đột biến chứng minh có người canh |
+|---|---|---|
+| V1 | **Van chặn hàng đợi**: trần lượt đang bay SUY RA từ chi phí băm đo được (`N ≤ luong·SAN/(heSo·chiPhi)`, máy này = 6), phần vượt trả `QUA_TAN_SUAT`. Quyết định gạt lấy TRƯỚC khi tra tài khoản | tắt van ⇒ công cụ đo thoát 1/2; và có test khẳng định tài khoản CÓ THẬT và KHÔNG TỒN TẠI nhận cùng một câu |
+| V1b | `server.mjs` **TỪ CHỐI KHỞI ĐỘNG** nếu `SAN_TU_CHOI_MS < 2×` chi phí băm đo lúc boot | e2e: `SAN_TU_CHOI_MS=1` ⇒ mã thoát **1**, có câu "TỪ CHỐI KHỞI ĐỘNG" và con số cần thiết |
+| V1c | `buCongViec` chỉ bù hàng **RẺ HƠN** `MAC_DINH` (bản cũ bù cả hàng đắt hơn ⇒ khuếch đại) | ⚠️ ô này bản trước ghi "`ln=17`: 3,25× → 1,00×" và gọi đó là đột biến — **sai, đó là đo trước/sau bản sửa của chính tôi**. Đột biến THẬT (R2 và R3 cùng làm): hoàn `reHonThamSoHienHanh` ⇒ khi đó 208/208 vẫn xanh và công cụ vẫn thoát 0. Nay đã sửa công cụ; hoàn lại ⇒ `RÒ RỈ LỘ LIỄU`, **thoát 1** |
+| V1d | Tham số băm về `src/lib/tham-so-bam.json` — `server.mjs` chạy node trần, không import được `.ts` | một hằng số chép tay sang hai ngôn ngữ là một hằng số sẽ lệch |
+| V2 | `scripts/nap-alias.mjs` cho node hiểu alias `@/` | test **chạy THẬT** `npm run mail:reconcile` như tiến trình con |
+| V3 | `timMonNo` khớp theo **sự kiện** (`khoaDenLuc`), dòng kết quả mang khoá tương quan | hoàn lại truy vấn cũ ⇒ **ĐỎ** |
+| V4 | Test SAVEPOINT ép **lỗi Postgres thật** thay vì `throw` của JS | gỡ 4 câu SAVEPOINT ⇒ **ĐỎ** (trước: 104/104 vẫn xanh) |
+| V5 | Theo dõi MỌI kết nối, thả cái không có request đang bay | ba dạng socket: **20 006 ms/mã 1 → ~15 ms/mã 0** |
+| V6 | `SMTP_PORT` qua `soDuong` có trần 65535 | 9 ca hỏng + cặp biên 1/65535 |
+
+**Đính chính mang sang từ vòng trước:** cơ chế "Next ở production không destroy
+socket Upgrade" là **SAI** — reviewer tự rút lại, Next 16.3.1 đóng sau 1 ms, nên
+tập `socketNangCap` cũ luôn RỖNG và test canh nó không bao giờ đỏ được. Lỗ thật
+là kết nối TCP **không gửi byte nào**, và `closeIdleConnections()` một mình
+không cứu được (tôi tự đo trên `http` thuần của Node).
+
+**Cổng:** GATE GREEN 13/13 · **208 test** (66 đơn vị + 120 tích hợp + 22 đầu-cuối).
+
+---
+
+# Vòng 4 — vòng phản biện DUY NHẤT của lần thử 3
+
+**R1 APPROVE-with-questions · R2 REQUEST-CHANGES · R3 REQUEST-CHANGES.**
+Vòng sửa đã làm; luật /dev hết vòng, không có vòng năm trong phiên này.
+
+## Cái nặng nhất: bản sửa kênh phụ của tôi đã PHÁ AC3
+
+R3 đo: `DANG_NHAP_DONG_THOI_TOI_DA=4` ⇒ *"năm lần sai SONG SONG vẫn khoá"* ĐỎ,
+`expected 4 to be 5`. Van GẠT lượt sai thứ năm nên nó không được đếm, bộ đếm
+dừng ở 4, **tài khoản không bao giờ khoá** — kẻ dò mật khẩu chỉ cần gửi song
+song là thoát FR-01-02. Trần 4 xảy ra ngay khi một lần băm ≥ 62,5 ms, và **R1
+đo đúng trần 4 trên máy của họ**. R3 còn dựng lại được nó TÌNH CỜ: chạy hai bộ
+test song song là đủ.
+
+**Sửa:** van đổi từ GẠT sang **XẾP HÀNG FIFO**. Chỉ `trần` lượt CHẠY cùng lúc
+(sàn còn bó), phần vượt CHỜ (mọi lượt vẫn được đếm ⇒ AC3 sống), và chỉ khi hàng
+đợi cũng đầy mới trả `QUA_TAN_SUAT`. Thời gian chờ không lộ gì: FIFO thuần, độ
+dài phụ thuộc tải toàn cục, quyết định vào-hàng lấy trước lượt tra CSDL.
+Chốt chống tái phát: test ép trần xuống **2** (dưới ngưỡng khoá 5) và đòi vẫn
+phải khoá.
+
+## Bảy mục còn lại
+
+| # | Ai | Phát hiện | Đã đổi gì |
+|---|---|---|---|
+| 1 | R2, R3 | **Nhánh CHẶN của công cụ đo là mã chết đúng chỗ nó cần sống**: bậc tổng hợp có `nTrongDb: 0` mà lại đòi `coHangThat` mới chặn ⇒ bậc ĐẮT hơn luôn rơi vào rổ "chỉ cảnh báo". Hoàn V1c ⇒ rò 116 ms, in "khai thác được? CÓ", **vẫn thoát 0** | bỏ hẳn phân biệt — MỌI bậc đều CHẶN |
+| 2 | R3 | **Van tự-VÔ-HIỆU bị `NaN` đi vòng**: `Math.min` gộp nhánh rỗng ⇒ ngưỡng = NaN ⇒ `x >= NaN` luôn false ⇒ dấu ✅ giả | lọc nhánh rỗng trước khi lấy min; < 2 nhánh dùng được thì trả "không đủ dữ liệu" |
+| 3 | tự bắt | Van tự-VÔ-HIỆU short-circuit TRƯỚC phán quyết, nên một hố **1430 ms so với 250 ms** chỉ ra "VÔ HIỆU" thay vì "TRƯỢT" | thêm phép **RÒ RỈ LỘ LIỄU**: phần dư > 5× nhiễu và > ngưỡng ⇒ thoát 1, bất kể dụng cụ có hợp lệ hay không |
+| 4 | tự bắt | **Công thức trần SAI theo hướng nguy hiểm trên máy chậm**: `floor(4·250/(2·142)) = 3` nhưng `ceil(3·2/4)·142 = 284 > 250` ⇒ sàn hết bó | giải qua SỐ ĐỢT: `floor(soDot · luong / heSo)`. Chính test bắt được, vì nó khẳng định lại BẤT ĐẲNG THỨC GỐC chứ không khẳng định lại công thức |
+| 5 | tự bắt | Mô hình giả định 4 lần băm song song chạy full tốc — **sai với scrypt** (mỗi lần chiếm 64–128 MB, bốn lần cùng lúc tranh băng thông) | đo chi phí theo **ĐỢT** (`luong` lần băm cùng lúc) thay vì đo một lần đơn lẻ; con số tự mang cả tranh chấp lẫn sai số của giả định `luongBamSongSong` |
+| 6 | tự bắt | Kiểm-và-xếp-hàng có `await` ở giữa ⇒ cả chùm nhường lượt cùng lúc và ai cũng thấy hàng đợi RỖNG ⇒ trần hàng đợi vô nghĩa | gom về MỘT điểm `await`, phần quyết định chạy đồng bộ |
+| 7 | R1 | Tôi khai kiểm-tra-khởi-động *"đo CPU chứ không đo đồng hồ tường"* — **sai**, `server.mjs` dùng `performance.now()` | rút câu đó; hai điểm khác biệt THẬT vẫn đứng: đo lúc chưa ai gửi gì, và TỪ CHỐI thay vì tự chỉnh |
+
+## Ghi thành GIỚI HẠN, không sửa trong vòng này
+
+Bảy mục ở [`REPORT.md` §Giới hạn](../REPORT.md) — trong đó ba mục là phát hiện
+của reviewer mà tôi CHỌN không sửa vì ngoài phạm vi A11(a): lỗ tắt-êm dạng thứ
+tư (R2), trần suy từ `MAC_DINH` chứ không từ bậc đắt nhất (R3 Q2), và
+`npm run evidence` không chạy được từ bản clone sạch (R3).
+
+**Cổng:** GATE GREEN 13/13 · **209 test** (66 + 121 + 22).

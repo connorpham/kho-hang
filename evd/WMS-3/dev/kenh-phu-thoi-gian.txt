@@ -1,29 +1,68 @@
--- Kênh phụ thời gian, đo QUA HTTP trên bản build sản xuất
--- 12 lượt mỗi nhánh · mỗi lượt một context trình duyệt riêng
--- đo từ lúc bấm nút tới lúc thông báo lỗi hiện ra
-A · KHÔNG TỒN TẠI            trung vị = 302.2 ms  [294.6 … 805.5]
-B · sai mật khẩu · ln=16     trung vị = 300.5 ms  [296.1 … 303.2]
-B · sai mật khẩu · ln=14     trung vị = 303.1 ms  [296.4 … 304.1]
-B · sai mật khẩu · ln=12     trung vị = 302.7 ms  [298.4 … 305.1]
-C · đang bị khoá             trung vị = 300.0 ms  [297.1 … 305.6]
-D · đã vô hiệu hoá           trung vị = 302.6 ms  [295.1 … 306.5]
+-- Một ĐỢT 4 lần băm tốn 94.0 ms · sàn 250 ms ⇒ trần đồng thời suy ra = 4 · K dùng = 4
+-- Bậc chi phí quét được (đọc từ CSDL, không cắm cứng):
+     ln=16,r=8,p=1      5322 hàng  ← MAC_DINH
+     ln=12,r=8,p=1      4011 hàng
+     ln=14,r=8,p=1       231 hàng
+     ln=17,r=8,p=1         0 hàng  (tổng hợp: bậc trên MAC_DINH)
 
-TỈ LỆ chậm nhất / nhanh nhất = 1.01×
+-- Kênh phụ thời gian, đo QUA HTTP bằng KHÁCH THÔ trên bản build sản xuất
+-- 12 lượt tuần tự + 4 lượt đồng thời mỗi nhánh · không dùng trình duyệt
 
--- Vòng ĐỒNG THỜI: 24 lượt cùng lúc mỗi nhánh
--- (vòng tuần tự ở trên KHÔNG đủ: sàn thời gian chỉ che khi nó còn bó)
-A · KHÔNG TỒN TẠI            trung vị = 869.3 ms  [321.6 … 1003.7]
-B · sai mật khẩu · ln=16     trung vị = 877.7 ms  [843.8 … 980.0]
-B · sai mật khẩu · ln=14     trung vị = 887.8 ms  [411.6 … 930.6]
-B · sai mật khẩu · ln=12     trung vị = 914.8 ms  [839.5 … 941.6]
-C · đang bị khoá             trung vị = 905.7 ms  [870.8 … 931.4]
-D · đã vô hiệu hoá           trung vị = 877.3 ms  [350.3 … 949.2]
+-- Vòng TUẦN TỰ (12 lượt/nhánh)
+A · KHÔNG TỒN TẠI              trung vị =   255.5 ms ±  0.2  p10..p90 [  255.1 …   257.1]  thô [255 … 257]
+A' · CHỨNG (y hệt A)           trung vị =   256.5 ms ±  0.7  p10..p90 [  254.8 …   259.9]  thô [254 … 260]
+B · sai mật khẩu · ln=16,r=8,p=1 trung vị =   255.5 ms ±  0.2  p10..p90 [  255.2 …   255.9]  thô [255 … 261]
+B · sai mật khẩu · ln=12,r=8,p=1 trung vị =   255.2 ms ±  0.3  p10..p90 [  254.2 …   256.2]  thô [253 … 257]
+B · sai mật khẩu · ln=14,r=8,p=1 trung vị =   255.6 ms ±  0.2  p10..p90 [  254.9 …   256.6]  thô [254 … 257]
+B · sai mật khẩu · ln=17,r=8,p=1 trung vị =   254.9 ms ±  0.2  p10..p90 [  254.2 …   257.2]  thô [254 … 258]
+C · đang bị khoá               trung vị =   255.4 ms ±  0.4  p10..p90 [  254.5 …   256.5]  thô [254 … 257]
+D · đã vô hiệu hoá             trung vị =   256.1 ms ±  0.3  p10..p90 [  255.4 …   256.7]  thô [255 … 258]
 
-TỈ LỆ đồng thời = 1.05×
+-- Vòng ĐỒNG THỜI: 6 chùm × 4 lượt/chùm, LUÂN PHIÊN — mỗi số là trung vị MỘT CHÙM
+A · KHÔNG TỒN TẠI              trung vị =   255.9 ms ±  0.3  p10..p90 [  255.0 …   256.6]  thô [255 … 257]
+A' · CHỨNG (y hệt A)           trung vị =   256.3 ms ±  0.4  p10..p90 [  255.3 …   257.3]  thô [255 … 258]
+B · sai mật khẩu · ln=16,r=8,p=1 trung vị =   255.1 ms ±  0.5  p10..p90 [  254.4 …   257.7]  thô [254 … 259]
+B · sai mật khẩu · ln=12,r=8,p=1 trung vị =   254.5 ms ±  0.2  p10..p90 [  254.2 …   256.0]  thô [254 … 257]
+B · sai mật khẩu · ln=14,r=8,p=1 trung vị =   254.5 ms ±  0.6  p10..p90 [  253.6 …   255.8]  thô [254 … 256]
+B · sai mật khẩu · ln=17,r=8,p=1 trung vị =   253.8 ms ±  0.3  p10..p90 [  253.3 …   254.5]  thô [253 … 255]
+C · đang bị khoá               trung vị =   256.6 ms ±  1.2  p10..p90 [  255.2 …   260.8]  thô [254 … 261]
+D · đã vô hiệu hoá             trung vị =   254.6 ms ±  0.6  p10..p90 [  253.6 …   256.2]  thô [253 … 256]
 
-QUẦN THỂ ĐỒNG NHẤT (tham số hiện hành) — điều kiện phải ĐẠT:
-  tỉ lệ = 1.04× · hai khoảng rời nhau? không
-QUẦN THỂ LỆCH tham số — phần dư đã biết, được báo cáo:
-  tỉ lệ = 1.05× · chậm nhất "B · sai mật khẩu · ln=12" · nhanh nhất "A · KHÔNG TỒN TẠI"
+-- Tỉ lệ bị van gạt (QUA_TAN_SUAT) theo nhánh:
+   A · KHÔNG TỒN TẠI              0.0%
+   A' · CHỨNG (y hệt A)           0.0%
+   B · sai mật khẩu · ln=16,r=8,p=1 0.0%
+   B · sai mật khẩu · ln=12,r=8,p=1 0.0%
+   B · sai mật khẩu · ln=14,r=8,p=1 0.0%
+   B · sai mật khẩu · ln=17,r=8,p=1 0.0%
+   C · đang bị khoá               0.0%
+   D · đã vô hiệu hoá             0.0%
+   ✅ chênh 0.0 điểm % — tỉ lệ gạt không phân biệt nhánh
 
-KẾT LUẬN: ở quần thể đồng nhất, các nhánh không tách được bằng đồng hồ — tuần tự lẫn đồng thời.
+[TUẦN TỰ] NHIỄU CỦA CHÍNH DỤNG CỤ, đo trên nhánh chứng A ↔ A':
+  lệch trung vị = 1.0 ms · dải 2σ của trung vị = 1.4 ms
+  ⇒ nhiễu = 1.4 ms · hiệu ứng nhỏ nhất phải bắt = 7.6 ms (3% của 254.9 ms)
+  ✅ dụng cụ phân giải đủ (nhiễu = 0.18× ngưỡng, và hai nhánh y hệt nhau KHÔNG tách được — đúng như phải thế)
+
+[ĐỒNG THỜI] NHIỄU CỦA CHÍNH DỤNG CỤ, đo trên nhánh chứng A ↔ A':
+  lệch trung vị = 0.4 ms · dải 2σ của trung vị = 0.7 ms
+  ⇒ nhiễu = 0.7 ms · hiệu ứng nhỏ nhất phải bắt = 7.6 ms (3% của 253.8 ms)
+  ✅ dụng cụ phân giải đủ (nhiễu = 0.09× ngưỡng, và hai nhánh y hệt nhau KHÔNG tách được — đúng như phải thế)
+
+[TUẦN TỰ] QUẦN THỂ ĐỒNG NHẤT (ln=16,r=8,p=1) — PHẢI ĐẠT:
+  chậm nhất "A' · CHỨNG (y hệt A)" vs nhanh nhất "C · đang bị khoá"
+  tỉ lệ trung vị = 1.00× · phần dư = 1.11 ms (ngưỡng đáng kể 7.7 ms) · dải 2σ rời nhau? không · đủ lớn? không ⇒ khai thác được? không
+[TUẦN TỰ] QUẦN THỂ LỆCH tham số — phần dư được báo cáo, không giấu:
+  B · sai mật khẩu · ln=12,r=8,p=1 1.00× · phần dư -0.20 ms · khai thác được? không  (4011 hàng thật ⇒ CHẶN)
+  B · sai mật khẩu · ln=14,r=8,p=1 1.00× · phần dư 0.24 ms · khai thác được? không  (231 hàng thật ⇒ CHẶN)
+  B · sai mật khẩu · ln=17,r=8,p=1 1.00× · phần dư -0.42 ms · khai thác được? không  (0 hàng thật, bậc tổng hợp ⇒ CHẶN)
+
+[ĐỒNG THỜI] QUẦN THỂ ĐỒNG NHẤT (ln=16,r=8,p=1) — PHẢI ĐẠT:
+  chậm nhất "C · đang bị khoá" vs nhanh nhất "D · đã vô hiệu hoá"
+  tỉ lệ trung vị = 1.01× · phần dư = 1.96 ms (ngưỡng đáng kể 7.6 ms) · dải 2σ rời nhau? không · đủ lớn? không ⇒ khai thác được? không
+[ĐỒNG THỜI] QUẦN THỂ LỆCH tham số — phần dư được báo cáo, không giấu:
+  B · sai mật khẩu · ln=12,r=8,p=1 1.00× · phần dư -0.07 ms · khai thác được? không  (4011 hàng thật ⇒ CHẶN)
+  B · sai mật khẩu · ln=14,r=8,p=1 1.00× · phần dư -0.11 ms · khai thác được? không  (231 hàng thật ⇒ CHẶN)
+  B · sai mật khẩu · ln=17,r=8,p=1 1.00× · phần dư -0.84 ms · khai thác được? không  (0 hàng thật, bậc tổng hợp ⇒ CHẶN)
+
+KẾT LUẬN: ở quần thể đồng nhất, các nhánh không tách được bằng đồng hồ — tuần tự lẫn đồng thời, và dụng cụ đã tự chứng minh đủ phân giải.

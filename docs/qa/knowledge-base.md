@@ -20,6 +20,7 @@
 | Bằng chứng phải sinh từ MỘT lần chạy | evidence, dev, qa | gate `evd_check` — cần một quy tắc đỏ được |
 | Báo cáo máy sinh phải sinh cả KẾT LUẬN, không chỉ số | evidence, dev | gate: nạp một bộ dữ liệu TRƯỢT vào trình sinh, báo cáo phải nói TRƯỢT |
 | KI-005 · dụng cụ đo phải công bố nhiễu của chính nó | evidence, dev, security | gate: script đo phải in khoảng của nhánh chứng và tự VÔ HIỆU khi nhiễu ≥ hiệu ứng |
+| KI-006 · bản vá đẻ ra lỗi mới; lời bảo đảm rộng hơn phép đo | dev, security, evidence | gate: commit của tệp bằng chứng không được CŨ HƠN commit của mã nó mô tả |
 
 ## Bằng chứng phải sinh từ MỘT lần chạy, và không được nối tay dòng nào
 
@@ -160,3 +161,48 @@ mà `throw` không đưa giao dịch Postgres vào trạng thái aborted. Chú t
 câu `SAVEPOINT`/`ROLLBACK TO`/`RELEASE` ⇒ **104/104 test vẫn xanh**. Quy tắc:
 **khi yêu cầu một chốt phòng thủ, phải kèm luôn phép đột biến chứng minh chốt đó
 có người canh** — dòng này áp cho cả tác giả lẫn reviewer.
+
+## KI-006 — Bản vá đẻ ra lỗi mới, và lời bảo đảm về bản vá rộng hơn thứ đã đo
+
+**Bối cảnh.** WMS-3, 21/08/2026. Một ngày, một ticket, ba lần cùng một khuôn.
+
+**Lần 1 — bản vá bảo mật phá một tính năng.** Van chặn hàng đợi thêm vào để đóng
+kênh phụ thời gian đã **GẠT** lượt vượt trần. Hệ quả: lượt sai thứ năm không
+được đếm ⇒ bộ đếm dừng ở 4 ⇒ **tài khoản không bao giờ khoá** ⇒ kẻ dò mật khẩu
+chỉ cần gửi song song là thoát FR-01-02. Trần bằng 4 xảy ra ngay khi một lần băm
+≥ 62,5 ms. Reviewer dựng lại được nó **tình cờ** — chạy hai bộ test song song.
+
+**Lần 2 — bản vá của bản vá dời lỗi ra một cửa khác.** Đổi GẠT sang XẾP HÀNG thì
+AC3 sống ở trần 1/2/3/4/6. Nhưng cửa gạt vẫn còn ở **trần hàng đợi**, và ở đó
+chữ ký `expected 3 to be 5`, `khoa_den_luc = null` sống lại nguyên vẹn. Hai
+reviewer độc lập dựng được. Luật đúng không phải "trần ≥ 5" mà là
+**trần đồng thời + trần hàng đợi ≥ ngưỡng khoá**.
+
+**Lần 3 — lời bảo đảm rộng hơn thứ đã đo.** Trong cùng một khối 4 dòng của
+`.env.example` tôi viết HAI câu, và cả hai đều sai theo **hai chiều ngược nhau**:
+"trần < 5 sẽ phá AC3" (sai — trần 1/2/3 vẫn khoá) và "xếp hàng nên trần nhỏ chỉ
+làm chậm chứ không mất lượt đếm" (sai — hai núm cùng nhỏ thì mất). Tôi vá một
+cửa rồi viết một lời bảo đảm cho cả lớp.
+
+**Luật rút ra:**
+
+1. **Một bản vá bảo mật phải chạy lại TOÀN BỘ tiêu chí chấp nhận, không chỉ
+   tiêu chí nó nhắm tới.** Van sinh ra cho G-01 và nó phá FR-01-02; hai thứ đó
+   cách nhau ba tầng trong đầu tôi nhưng chung một bộ đếm trong mã.
+2. **Sau khi vá, hỏi "cửa này còn ở đâu nữa?" trước khi hỏi "vá xong chưa?"**
+   Gạt tải là một HÀNH VI, không phải một dòng mã; nó ở mọi chỗ có thể trả lời
+   sớm. Vá một chỗ rồi tuyên bố lớp đã đóng là sai kiểu.
+3. **Lời bảo đảm phải hẹp bằng đúng phép đo.** Nếu chỉ đo trần đồng thời thì chỉ
+   được nói về trần đồng thời. Câu "trần nhỏ chỉ làm chậm" là một định lý; tôi
+   không có định lý, tôi có bốn lần chạy.
+4. **Sinh lại bằng chứng SAU khi sửa mã, và trước khi trích nó.** Tệp
+   `kenh-phu-thoi-gian.txt` tôi commit là của bản trước khi sửa; REPORT trích nó
+   như thể nó mô tả mã đang chạy. Reviewer bắt bằng đúng một lệnh:
+   `git log -1 --format=%H -- <tệp bằng chứng>` rồi so với `git log -1 HEAD`.
+   **Nếu commit của tệp bằng chứng cũ hơn commit của mã, hồ sơ đang nói dối.**
+   Đây là một câu `if` — nên nó thuộc về một cổng, không thuộc về trí nhớ.
+
+**Điểm chung với KI-005, và vì sao phải tách:** KI-005 nói dụng cụ đo có thể vô
+hiệu. KI-006 nói **bản vá có thể vừa đúng vừa đẻ ra lỗi mới, và người viết nó là
+người tệ nhất để phán đoán phạm vi của chính nó.** Trong phiên này tôi khai sai
+năm lần; ba trong số đó là về bản vá tôi vừa viết xong vài phút trước.

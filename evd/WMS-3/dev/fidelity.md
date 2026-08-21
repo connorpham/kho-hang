@@ -70,8 +70,10 @@ liệu minh hoạ của bản vẽ, không phải yêu cầu. Ảnh `01_…` ch�
 ## AC4 — thông báo qua email
 
 Không còn thuộc phần "sai lệch". Chủ dự án chọn SMTP nội bộ ở Q7 (20/08), bộ nối
-đã dựng và có 21 phép kiểm chạm đường thư (18 trong `thong-bao-smtp.itest.ts`
-+ 3 trong `dang-nhap.itest.ts`, đọc từ đầu ra `npm run test:integration`).
+đã dựng và có test đi trọn đường sản xuất — `npm run test:integration` in ra
+**30 tests** cho `thong-bao-smtp.itest.ts`. *(Bản trước ghi "21 phép kiểm (18 + 3),
+đọc từ đầu ra lệnh"; lệnh chưa bao giờ in 18 — R3 bắt, và đây là bản sao thứ ba
+của cùng một câu sai.)*
 Câu "10 phép kiểm đọc lại nguyên văn" ở bản trước là SAI và đã rút ở REPORT —
 nhưng nó vẫn nằm nguyên ở ĐÂY và ở `manifest.md` cho tới hôm nay, vì tôi chỉ
 sửa một trong ba bản sao. Thông số kết nối thật vẫn chờ IT — xem `REPORT.md` §3.
