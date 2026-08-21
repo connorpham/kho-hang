@@ -1,6 +1,7 @@
 # ADR-0001 — Stack: Next.js + Prisma + PostgreSQL
 
-- **Trạng thái:** Accepted (chờ xác nhận khi OPN-03 được quyết định)
+- **Trạng thái:** **Accepted** (không còn điều kiện) — OPN-03 đã chốt **đám mây
+  công cộng** ngày 21/08/2026, tức điều kiện treo ở đây đã được đáp ứng.
 - **Ngày:** 19/08/2026
 - **Bối cảnh tài liệu:** SRS TP-WMS-SRS-001 v1.0 §2.3, §2.4; SRD TP-WMS-SRD-001 v1.0 OPN-03
 

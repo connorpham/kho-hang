@@ -35,3 +35,10 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-20 | PM | Connor Pham | T0 phiên 8 — dispatch WMS-2 lần 2/2 | done · tok ≈ 4k | docs/pm/sessions/2026-08-20-1030.md |
 | 2026-08-20 | PM | Connor Pham | T0+T1 phiên 9 — A9 gỡ khoá WMS-2 | done · tok ≈ 6k | docs/pm/decisions.md |
 | 2026-08-20 | DEV | Connor Pham | WMS-2 lần thử 3 — 3/3 chữ ký, PR #4 merge | done · tok ≈ 48k | PR #4 |
+| 2026-08-20 | PM | Connor Pham | T0+T1 phiên 10 — dispatch WMS-3 | done · tok ≈ 5k | docs/pm/sessions/2026-08-20-1236.md |
+| 2026-08-20 | DEV | Connor Pham | WMS-3 màn hình đăng nhập SC-01 + tầng test e2e | failed: vòng review 3 người (3× REQUEST-CHANGES vòng 1, 3× vòng 2 — hết vòng phản biện) | evd/WMS-3/dev/review.md |
+| 2026-08-20 | PM | Connor Pham | Q6 đóng (tiền đề sai) · Q7 mở — hạ tầng email | done · tok ≈ 3k | docs/pm/decisions.md |
+| 2026-08-20 | DEV | Connor Pham | WMS-3 lần thử 2 — sửa 22 phát hiện, vòng phản biện duy nhất | failed: vòng review 3 người (3× REQUEST-CHANGES; kênh phụ chưa đóng ở hàng lệch tham số băm) | evd/WMS-3/dev/review.md |
+| 2026-08-20 | PM | Connor Pham | Cải chính 7 câu sai trong hồ sơ WMS-3 + khoá A11 (loop guard #3) | done · tok ≈ 18k | docs/pm/decisions.md |
+| 2026-08-21 | DEV | Connor Pham | WMS-3 lần thử 3 — chặn hàng đợi, dụng cụ đo viết lại | failed: vòng review 3 người (3× REQUEST-CHANGES ở tái review; cửa gạt dời ra trần hàng đợi vẫn phá AC3) | evd/WMS-3/dev/review.md |
+| 2026-08-21 | PM | Connor Pham | Cải chính 9 câu sai + sinh lại bằng chứng + khoá A12 | done · tok ≈ 40k | docs/pm/decisions.md |

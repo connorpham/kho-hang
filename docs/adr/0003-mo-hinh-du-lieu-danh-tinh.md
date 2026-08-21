@@ -1,6 +1,12 @@
 # ADR-0003 — Mô hình dữ liệu danh tính: NguoiDung, VaiTro, Quyen, Kho, Phien
 
-- **Trạng thái:** **Proposed** — chấp nhận là quyền của chủ dự án
+- **Trạng thái:** **ACCEPTED 2026-08-21** — theo ngoại lệ của luật /team: ADR này
+  *chỉ mô tả thứ đã chạy trong mã*. WMS-2 đã merge (PR #4, trạng thái Done) và
+  `prisma/schema.prisma` trên `develop` mang đúng 9 model ADR mô tả. Đã đếm lại
+  `Kho` = **6 cột scalar** (id, ma, ten, dang_hoat_dong, tao_luc, cap_nhat_luc),
+  khớp §Chỗ phải đoán — ADR này từng sai chính phép đếm đó nên tôi đếm lại trước
+  khi chuyển trạng thái. Vòng challenger: review 3 người của WMS-2 trên diff
+  high-stakes, `evd/WMS-2/dev/review.md`.
 - **Ngày:** 20/08/2026
 - **Bối cảnh tài liệu:** SRS §5.1 (danh sách thực thể), §5.3 (DI-07), §8 (ma trận
   phân quyền); FR-20-01, FR-20-02, FR-20-09; FR-06-01, FR-06-02; SC-01 FR-01-01…08;
